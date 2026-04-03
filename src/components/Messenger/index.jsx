@@ -114,6 +114,13 @@ export function Messenger() {
     }
   }
 
+  function renameTerminal(terminalId, newLabel) {
+    if (!newLabel.trim()) return;
+    setTerminals(prev => prev.map(t =>
+      t.terminalId === terminalId ? { ...t, label: newLabel.trim() } : t
+    ));
+  }
+
   async function handlePermission(permissionId, decision) {
     await fetch(`/api/hooks/permission/${permissionId}/decide`, {
       method: "POST",
@@ -153,7 +160,11 @@ export function Messenger() {
                   "w-1.5 h-1.5 rounded-full shrink-0",
                   t.status === "active" ? "bg-forge-green animate-pulse" : "bg-forge-muted"
                 )} />
-                <span className="font-medium max-w-[120px] truncate">{t.label}</span>
+                <EditableLabel
+                  value={t.label}
+                  onSave={(v) => renameTerminal(t.terminalId, v)}
+                  className="font-medium max-w-[120px]"
+                />
                 <span
                   onClick={(e) => {
                     e.stopPropagation();
@@ -264,7 +275,11 @@ export function Messenger() {
                         "w-1.5 h-1.5 rounded-full shrink-0",
                         t.status === "active" ? "bg-forge-green animate-pulse" : "bg-forge-muted"
                       )} />
-                      <span className="text-[10px] font-medium text-forge-text truncate">{t.label}</span>
+                      <EditableLabel
+                        value={t.label}
+                        onSave={(v) => renameTerminal(t.terminalId, v)}
+                        className="text-[10px] font-medium max-w-[100px]"
+                      />
                       <span className="text-[9px] text-forge-muted font-mono truncate">{t.cwd}</span>
                       <div className="ml-auto flex items-center gap-0.5 shrink-0">
                         <button
@@ -786,4 +801,58 @@ function MiniEvent({ event }) {
     default:
       return null;
   }
+}
+
+
+// ── Inline editable label — double-click to rename ──
+function EditableLabel({ value, onSave, className = "" }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const inputRef = useRef(null);
+
+  useEffect(() => { setDraft(value); }, [value]);
+  useEffect(() => {
+    if (editing) {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+  }, [editing]);
+
+  function commit() {
+    setEditing(false);
+    if (draft.trim() && draft.trim() !== value) onSave(draft.trim());
+    else setDraft(value);
+  }
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") commit();
+          if (e.key === "Escape") { setDraft(value); setEditing(false); }
+          e.stopPropagation();
+        }}
+        onClick={(e) => e.stopPropagation()}
+        className={clsx(
+          "bg-forge-bg border border-forge-accent rounded px-1 py-0 text-forge-text outline-none",
+          className
+        )}
+        style={{ width: Math.max(draft.length * 7, 40) + "px" }}
+      />
+    );
+  }
+
+  return (
+    <span
+      onDoubleClick={(e) => { e.stopPropagation(); setEditing(true); }}
+      className={clsx("truncate cursor-default text-forge-text", className)}
+      title="Double-click to rename"
+    >
+      {value}
+    </span>
+  );
 }

@@ -31,6 +31,7 @@ export const XTerminal = forwardRef(function XTerminal({ terminalId, wsRef, onRe
   const containerRef = useRef(null);
   const termRef = useRef(null);
   const fitRef = useRef(null);
+  const resizeTimerRef = useRef(null);
 
   useImperativeHandle(ref, () => ({
     fit: () => fitRef.current?.fit(),
@@ -56,9 +57,9 @@ export const XTerminal = forwardRef(function XTerminal({ terminalId, wsRef, onRe
     term.loadAddon(fit);
     term.open(containerRef.current);
 
-    // Small delay to let the container settle, then fit
+    // Initial fit after container settles
     requestAnimationFrame(() => {
-      fit.fit();
+      try { fit.fit(); } catch {}
     });
 
     termRef.current = term;
@@ -75,18 +76,22 @@ export const XTerminal = forwardRef(function XTerminal({ terminalId, wsRef, onRe
       }
     });
 
-    // Resize handling
+    // Debounced resize — waits 150ms after last resize event to avoid
+    // hammering fit() during grid layout transitions
     const resizeObserver = new ResizeObserver(() => {
-      requestAnimationFrame(() => {
-        fit.fit();
-        const ws = wsRef?.current;
-        if (ws && ws.readyState === 1) {
-          ws.send(JSON.stringify({
-            type: "TERMINAL_RESIZE",
-            payload: { terminalId, cols: term.cols, rows: term.rows },
-          }));
-        }
-      });
+      if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
+      resizeTimerRef.current = setTimeout(() => {
+        try {
+          fit.fit();
+          const ws = wsRef?.current;
+          if (ws && ws.readyState === 1) {
+            ws.send(JSON.stringify({
+              type: "TERMINAL_RESIZE",
+              payload: { terminalId, cols: term.cols, rows: term.rows },
+            }));
+          }
+        } catch {}
+      }, 150);
     });
     resizeObserver.observe(containerRef.current);
 
@@ -102,9 +107,9 @@ export const XTerminal = forwardRef(function XTerminal({ terminalId, wsRef, onRe
     onReady?.();
 
     return () => {
+      if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
       resizeObserver.disconnect();
       term.dispose();
-      // Detach
       const ws2 = wsRef?.current;
       if (ws2 && ws2.readyState === 1) {
         ws2.send(JSON.stringify({
