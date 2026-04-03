@@ -333,104 +333,104 @@ export function Messenger() {
           )}
         </div>
 
-        {/* Content */}
-        {tab === "terminal" ? (
-          <div className="flex-1 flex flex-col overflow-hidden">
-            {displayTerminalId ? (
-              <XTerminal
-                terminalId={displayTerminalId}
-                wsRef={wsRef}
-              />
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center gap-4 text-forge-muted">
-                <div className="w-16 h-16 rounded-2xl bg-forge-surface border border-forge-border flex items-center justify-center">
-                  <Terminal size={28} className="text-forge-accent" />
-                </div>
-                <div className="text-center">
-                  <p className="text-sm font-semibold text-forge-text mb-1">No terminal active</p>
-                  <p className="text-xs text-forge-muted max-w-xs">
-                    Click "New" to spawn a Claude Code session, or select a session and switch to the Events tab to see its activity.
-                  </p>
-                </div>
-                <div className="flex flex-col items-center gap-2">
-                  <button
-                    onClick={() => spawnClaude(cwdInput)}
-                    disabled={spawning}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-forge-accent text-white text-xs font-semibold hover:bg-orange-500 disabled:opacity-50 transition-colors"
+        {/* Content — all tabs always mounted, hidden via CSS to preserve terminal state */}
+        <div className={clsx("flex-1 flex flex-col overflow-hidden", tab !== "terminal" && "hidden")}>
+          {displayTerminalId ? (
+            <XTerminal
+              terminalId={displayTerminalId}
+              wsRef={wsRef}
+            />
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center gap-4 text-forge-muted">
+              <div className="w-16 h-16 rounded-2xl bg-forge-surface border border-forge-border flex items-center justify-center">
+                <Terminal size={28} className="text-forge-accent" />
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-semibold text-forge-text mb-1">No terminal active</p>
+                <p className="text-xs text-forge-muted max-w-xs">
+                  Click "New" to spawn a Claude Code session, or select a session and switch to the Events tab to see its activity.
+                </p>
+              </div>
+              <div className="flex flex-col items-center gap-2">
+                <button
+                  onClick={() => spawnClaude(cwdInput)}
+                  disabled={spawning}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-forge-accent text-white text-xs font-semibold hover:bg-orange-500 disabled:opacity-50 transition-colors"
+                >
+                  <Play size={12} />
+                  Start Claude Code
+                </button>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <div
+                    onClick={() => setAutoApprove(!autoApprove)}
+                    className={clsx(
+                      "w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors",
+                      autoApprove ? "bg-forge-accent border-forge-accent" : "border-forge-border"
+                    )}
                   >
-                    <Play size={12} />
-                    Start Claude Code
-                  </button>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <div
-                      onClick={() => setAutoApprove(!autoApprove)}
-                      className={clsx(
-                        "w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors",
-                        autoApprove ? "bg-forge-accent border-forge-accent" : "border-forge-border"
-                      )}
-                    >
-                      {autoApprove && <svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-4" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" /></svg>}
-                    </div>
-                    <span className="text-[10px] text-forge-muted">Auto-approve (--dangerously-skip-permissions)</span>
-                  </label>
-                </div>
+                    {autoApprove && <svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-4" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" /></svg>}
+                  </div>
+                  <span className="text-[10px] text-forge-muted">Auto-approve (--dangerously-skip-permissions)</span>
+                </label>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className={clsx("flex-1 flex flex-col overflow-hidden", tab !== "multi" && "hidden")}>
+          <MultiSession wsRef={wsRef} />
+        </div>
+
+        <div className={clsx("flex-1 flex flex-col overflow-hidden", tab !== "events" && "hidden")}>
+          {/* Events tab — raw feed */}
+          <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2">
+            {events.length === 0 && (!selected?.messages || selected.messages.length === 0) ? (
+              <div className="flex flex-col items-center justify-center h-full gap-3 text-forge-muted">
+                <List size={28} />
+                <p className="text-xs">No events yet</p>
+              </div>
+            ) : (
+              <>
+                {events.length === 0 && selected?.messages?.map((msg) => (
+                  <MessageBubble key={msg.id} msg={msg} />
+                ))}
+                {events.map((event, i) => (
+                  <EventRow key={i} event={event} onPermission={handlePermission} />
+                ))}
+              </>
+            )}
+            <div ref={bottomRef} />
+          </div>
+
+          {/* Quick reply for events tab */}
+          <div className="p-3 border-t border-forge-border">
+            {copied && (
+              <div className="mb-2 flex items-center gap-2 text-xs text-forge-green bg-forge-surface border border-forge-green/30 rounded-lg px-3 py-1.5">
+                <CheckCircle2 size={12} />
+                <span>Copied to clipboard</span>
               </div>
             )}
-          </div>
-        ) : tab === "multi" ? (
-          <MultiSession wsRef={wsRef} />
-        ) : (
-          /* Events tab — raw feed */
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2">
-              {events.length === 0 && (!selected?.messages || selected.messages.length === 0) ? (
-                <div className="flex flex-col items-center justify-center h-full gap-3 text-forge-muted">
-                  <List size={28} />
-                  <p className="text-xs">No events yet</p>
-                </div>
-              ) : (
-                <>
-                  {events.length === 0 && selected?.messages?.map((msg) => (
-                    <MessageBubble key={msg.id} msg={msg} />
-                  ))}
-                  {events.map((event, i) => (
-                    <EventRow key={i} event={event} onPermission={handlePermission} />
-                  ))}
-                </>
-              )}
-              <div ref={bottomRef} />
-            </div>
-
-            {/* Quick reply for events tab */}
-            <div className="p-3 border-t border-forge-border">
-              {copied && (
-                <div className="mb-2 flex items-center gap-2 text-xs text-forge-green bg-forge-surface border border-forge-green/30 rounded-lg px-3 py-1.5">
-                  <CheckCircle2 size={12} />
-                  <span>Copied to clipboard</span>
-                </div>
-              )}
-              <div className="flex gap-2">
-                <input
-                  value={reply}
-                  onChange={(e) => setReply(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendReply()}
-                  placeholder={isPending ? "Agent is waiting for your reply..." : "Send a message..."}
-                  className={clsx(
-                    "flex-1 bg-forge-surface border rounded-lg px-3 py-2 text-xs text-forge-text placeholder:text-forge-muted outline-none transition-colors font-mono",
-                    isPending ? "border-forge-accent" : "border-forge-border focus:border-forge-muted"
-                  )}
-                />
-                <button
-                  onClick={sendReply}
-                  disabled={!reply.trim()}
-                  className="w-8 h-8 rounded-lg bg-forge-accent flex items-center justify-center disabled:opacity-40 hover:bg-orange-500 transition-colors"
-                >
-                  <Send size={13} className="text-white" />
-                </button>
-              </div>
+            <div className="flex gap-2">
+              <input
+                value={reply}
+                onChange={(e) => setReply(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendReply()}
+                placeholder={isPending ? "Agent is waiting for your reply..." : "Send a message..."}
+                className={clsx(
+                  "flex-1 bg-forge-surface border rounded-lg px-3 py-2 text-xs text-forge-text placeholder:text-forge-muted outline-none transition-colors font-mono",
+                  isPending ? "border-forge-accent" : "border-forge-border focus:border-forge-muted"
+                )}
+              />
+              <button
+                onClick={sendReply}
+                disabled={!reply.trim()}
+                className="w-8 h-8 rounded-lg bg-forge-accent flex items-center justify-center disabled:opacity-40 hover:bg-orange-500 transition-colors"
+              >
+                <Send size={13} className="text-white" />
+              </button>
             </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

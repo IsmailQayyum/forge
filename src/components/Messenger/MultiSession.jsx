@@ -70,9 +70,8 @@ export function MultiSession({ wsRef }) {
   }, [wsRef?.current]);
 
   const activeCount = terminals.filter(t => t.status === "active").length;
-  const visibleTerminals = layout === "focus" && focusedId
-    ? terminals.filter(t => t.terminalId === focusedId)
-    : terminals;
+  // Always render all terminals to preserve xterm state; hide non-focused via CSS
+  const visibleTerminals = terminals;
 
   return (
     <div className="flex flex-col h-full">
@@ -167,7 +166,10 @@ export function MultiSession({ wsRef }) {
           layout === "grid" && terminals.length >= 4 && "grid-cols-2 grid-rows-2",
         )}>
           {visibleTerminals.map(t => (
-            <div key={t.terminalId} className="relative bg-forge-bg flex flex-col min-h-0">
+            <div key={t.terminalId} className={clsx(
+              "relative bg-forge-bg flex flex-col min-h-0",
+              layout === "focus" && focusedId && t.terminalId !== focusedId && "hidden"
+            )}>
               <div className="flex items-center gap-2 px-2 py-1 bg-forge-surface border-b border-forge-border shrink-0">
                 <span className={clsx("w-1.5 h-1.5 rounded-full", t.status === "active" ? "bg-forge-green animate-pulse" : "bg-forge-muted")} />
                 <span className="text-[10px] font-semibold text-forge-text">{t.label}</span>
