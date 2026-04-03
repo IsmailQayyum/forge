@@ -2,7 +2,9 @@ import React from "react";
 import { useForgeStore } from "../../store/index.js";
 import { SessionCard } from "./SessionCard.jsx";
 import { ActivityFeed } from "./ActivityFeed.jsx";
-import { Monitor } from "lucide-react";
+import { QuickActions } from "./QuickActions.jsx";
+import { SessionSearch } from "./SessionSearch.jsx";
+import { Monitor, Download } from "lucide-react";
 
 export function SessionDashboard() {
   const sessions = useForgeStore((s) => Object.values(s.sessions));
@@ -10,6 +12,21 @@ export function SessionDashboard() {
   const selectSession = useForgeStore((s) => s.selectSession);
 
   const selected = sessions.find((s) => s.id === selectedId) || sessions[0];
+
+  async function exportSelected() {
+    if (!selected) return;
+    try {
+      const res = await fetch(`/api/sessions/${selected.id}/export`);
+      const { markdown, name } = await res.json();
+      const blob = new Blob([markdown], { type: "text/markdown" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `session-${name || selected.id.slice(0, 8)}.md`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {}
+  }
 
   return (
     <div className="flex h-full">
@@ -22,6 +39,12 @@ export function SessionDashboard() {
             {sessions.length}
           </span>
         </div>
+
+        {/* Search */}
+        <SessionSearch onSelectSession={selectSession} />
+
+        {/* Quick actions */}
+        <QuickActions />
 
         <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-1.5">
           {sessions.length === 0 ? (
@@ -47,7 +70,19 @@ export function SessionDashboard() {
       {/* Activity feed */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {selected ? (
-          <ActivityFeed session={selected} />
+          <>
+            {/* Export button in top-right */}
+            <div className="absolute top-2 right-4 z-10">
+              <button
+                onClick={exportSelected}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-forge-surface border border-forge-border text-[10px] text-forge-muted hover:text-forge-text hover:border-forge-muted transition-colors"
+                title="Export session as markdown"
+              >
+                <Download size={10} /> Export
+              </button>
+            </div>
+            <ActivityFeed session={selected} />
+          </>
         ) : (
           <div className="flex items-center justify-center h-full text-forge-muted text-sm">
             Select a session to see activity

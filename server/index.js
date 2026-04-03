@@ -11,6 +11,11 @@ import { integrationsRouter } from "./routes/integrations.js";
 import { agentsRouter } from "./routes/agents.js";
 import { sessionsRouter } from "./routes/sessions.js";
 import { hooksRouter, setHooksBroadcast } from "./routes/hooks.js";
+import { promptsRouter } from "./routes/prompts.js";
+import { costsRouter } from "./routes/costs.js";
+import { gitRouter } from "./routes/git.js";
+import { claudemdRouter } from "./routes/claudemd.js";
+import { getQuickActions } from "./stores/quick-actions.js";
 import {
   spawnTerminal, writeToTerminal, resizeTerminal,
   attachClient, detachClient, detachClientFromAll,
@@ -33,6 +38,11 @@ app.use("/api/integrations", integrationsRouter);
 app.use("/api/agents", agentsRouter);
 app.use("/api/sessions", sessionsRouter);
 app.use("/api/hooks", hooksRouter);
+app.use("/api/prompts", promptsRouter);
+app.use("/api/costs", costsRouter);
+app.use("/api/git", gitRouter);
+app.use("/api/claudemd", claudemdRouter);
+app.get("/api/quick-actions", (_, res) => res.json(getQuickActions()));
 app.get("/api/health", (_, res) => res.json({ ok: true, version: "1.0.0" }));
 
 // Terminal API
