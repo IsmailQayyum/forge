@@ -6,7 +6,7 @@ import {
   Folder, Home, ArrowUp, Shield, ShieldCheck, ShieldX,
   RotateCcw, Maximize2, Minimize2, PanelRightOpen, PanelRightClose,
   Zap, FileText, Edit, Search, Users, Clock, AlertCircle, CheckCircle2,
-  Bot, User, Send,
+  Bot, User, Send, LayoutGrid, Rows3,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -29,6 +29,7 @@ export function Messenger() {
   const [autoApprove, setAutoApprove] = useState(false);
   const [showBrowser, setShowBrowser] = useState(false);
   const [showActivity, setShowActivity] = useState(false);
+  const [layout, setLayout] = useState("tabs"); // "tabs" | "grid"
   const [cwdInput, setCwdInput] = useState("");
   const wsRef = useRef(null);
 
@@ -186,6 +187,31 @@ export function Messenger() {
                 <span className="text-[10px] text-forge-yellow font-semibold">{permCount}</span>
               </div>
             )}
+            {/* Layout toggle — only show when 2+ terminals */}
+            {terminals.length >= 2 && (
+              <div className="flex items-center bg-forge-surface rounded-md p-0.5 mr-1">
+                <button
+                  onClick={() => setLayout("tabs")}
+                  className={clsx(
+                    "p-1 rounded transition-colors",
+                    layout === "tabs" ? "bg-forge-accent text-white" : "text-forge-muted hover:text-forge-text"
+                  )}
+                  title="Tabs view"
+                >
+                  <Rows3 size={11} />
+                </button>
+                <button
+                  onClick={() => setLayout("grid")}
+                  className={clsx(
+                    "p-1 rounded transition-colors",
+                    layout === "grid" ? "bg-forge-accent text-white" : "text-forge-muted hover:text-forge-text"
+                  )}
+                  title="Grid view"
+                >
+                  <LayoutGrid size={11} />
+                </button>
+              </div>
+            )}
             <button
               onClick={() => setShowActivity(!showActivity)}
               className={clsx(
@@ -212,9 +238,89 @@ export function Messenger() {
               cwdInput={cwdInput}
               setCwdInput={setCwdInput}
             />
+          ) : layout === "grid" && terminals.length >= 2 ? (
+            <>
+              {/* Grid layout — all terminals visible, split equally */}
+              <div className={clsx(
+                "w-full h-full grid gap-px bg-forge-border",
+                terminals.length === 2 && "grid-cols-2 grid-rows-1",
+                terminals.length === 3 && "grid-cols-2 grid-rows-2",
+                terminals.length === 4 && "grid-cols-2 grid-rows-2",
+                terminals.length >= 5 && terminals.length <= 6 && "grid-cols-3 grid-rows-2",
+                terminals.length >= 7 && "grid-cols-3 grid-rows-3",
+              )}>
+                {terminals.map(t => (
+                  <div
+                    key={t.terminalId}
+                    className={clsx(
+                      "relative bg-forge-bg flex flex-col min-h-0 min-w-0",
+                      // For 3 terminals, make the last one span full bottom row
+                      terminals.length === 3 && terminals.indexOf(t) === 2 && "col-span-2"
+                    )}
+                  >
+                    {/* Grid cell header */}
+                    <div className="flex items-center gap-1.5 px-2 py-1 bg-forge-surface/80 border-b border-forge-border shrink-0">
+                      <span className={clsx(
+                        "w-1.5 h-1.5 rounded-full shrink-0",
+                        t.status === "active" ? "bg-forge-green animate-pulse" : "bg-forge-muted"
+                      )} />
+                      <span className="text-[10px] font-medium text-forge-text truncate">{t.label}</span>
+                      <span className="text-[9px] text-forge-muted font-mono truncate">{t.cwd}</span>
+                      <div className="ml-auto flex items-center gap-0.5 shrink-0">
+                        <button
+                          onClick={() => { setLayout("tabs"); setActiveTermId(t.terminalId); }}
+                          className="p-0.5 text-forge-muted hover:text-forge-text transition-colors"
+                          title="Focus this terminal"
+                        >
+                          <Maximize2 size={9} />
+                        </button>
+                        <button
+                          onClick={() => t.status === "active" ? killSession(t.terminalId) : removeSession(t.terminalId)}
+                          className="p-0.5 text-forge-muted hover:text-forge-red transition-colors"
+                          title={t.status === "active" ? "Kill" : "Remove"}
+                        >
+                          <X size={9} />
+                        </button>
+                      </div>
+                    </div>
+                    {/* Terminal */}
+                    <div className="flex-1 min-h-0">
+                      {t.status === "active" ? (
+                        <XTerminal terminalId={t.terminalId} wsRef={wsRef} />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center h-full gap-2 text-forge-muted">
+                          <p className="text-[10px]">Exited</p>
+                          <button
+                            onClick={() => { removeSession(t.terminalId); spawnSession(t.cwd, t.label); }}
+                            className="flex items-center gap-1 px-2 py-1 rounded text-[10px] bg-forge-surface border border-forge-border hover:border-forge-muted transition-colors"
+                          >
+                            <RotateCcw size={8} /> Restart
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Directory browser overlay */}
+              {showBrowser && (
+                <div className="absolute inset-0 z-10 bg-forge-bg/95 backdrop-blur-sm">
+                  <DirectoryBrowser
+                    onSelect={(dir) => spawnSession(dir, dir.split("/").pop())}
+                    onClose={() => setShowBrowser(false)}
+                    cwdInput={cwdInput}
+                    setCwdInput={setCwdInput}
+                    autoApprove={autoApprove}
+                    setAutoApprove={setAutoApprove}
+                    spawning={spawning}
+                  />
+                </div>
+              )}
+            </>
           ) : (
             <>
-              {/* Render all terminals but only show active — preserves xterm state */}
+              {/* Tabs layout — one terminal visible, others preserved hidden */}
               {terminals.map(t => (
                 <div
                   key={t.terminalId}
@@ -258,8 +364,8 @@ export function Messenger() {
           )}
         </div>
 
-        {/* ── Status bar ── */}
-        {activeTerminal && (
+        {/* ── Status bar (tabs mode only) ── */}
+        {layout === "tabs" && activeTerminal && (
           <div className="flex items-center gap-3 px-3 py-1 border-t border-forge-border bg-forge-surface/50 shrink-0">
             <div className="flex items-center gap-1.5">
               <span className={clsx(
