@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 320" fill="none">
+  <defs>
+    <linearGradient id="bannerBg" x1="0" y1="0" x2="1200" y2="320">
+      <stop offset="0%" stop-color="#0e0e10"/>
+      <stop offset="50%" stop-color="#141416"/>
+      <stop offset="100%" stop-color="#0e0e10"/>
+    </linearGradient>
+    <linearGradient id="bFlame" x1="80" y1="30" x2="80" y2="200">
+      <stop offset="0%" stop-color="#fde68a"/>
+      <stop offset="30%" stop-color="#f97316"/>
+      <stop offset="70%" stop-color="#ea580c"/>
+      <stop offset="100%" stop-color="#c2410c"/>
+    </linearGradient>
+    <linearGradient id="bWingL" x1="20" y1="80" x2="70" y2="180">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#dc2626"/>
+    </linearGradient>
+    <linearGradient id="bWingR" x1="90" y1="80" x2="140" y2="180">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#dc2626"/>
+    </linearGradient>
+    <linearGradient id="bChest" x1="80" y1="100" x2="80" y2="190">
+      <stop offset="0%" stop-color="#fef3c7"/>
+      <stop offset="100%" stop-color="#fbbf24"/>
+    </linearGradient>
+    <linearGradient id="bTail" x1="80" y1="190" x2="80" y2="260">
+      <stop offset="0%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#dc2626" stop-opacity="0.2"/>
+    </linearGradient>
+    <linearGradient id="bCrest" x1="80" y1="30" x2="80" y2="65">
+      <stop offset="0%" stop-color="#fef3c7"/>
+      <stop offset="100%" stop-color="#f97316"/>
+    </linearGradient>
+    <linearGradient id="accentLine" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#f97316" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#f97316" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="textGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fafafa"/>
+      <stop offset="100%" stop-color="#d4d4d8"/>
+    </linearGradient>
+    <filter id="bGlow">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="bSoftGlow">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="320" fill="url(#bannerBg)"/>
+
+  <!-- Subtle dot grid -->
+  <g opacity="0.04">
+    <pattern id="dots" x="0" y="0" width="30" height="30" patternUnits="userSpaceOnUse">
+      <circle cx="15" cy="15" r="0.8" fill="#fff"/>
+    </pattern>
+    <rect width="1200" height="320" fill="url(#dots)"/>
+  </g>
+
+  <!-- Phoenix (scaled to banner, positioned left) -->
+  <g transform="translate(55, 25) scale(0.72)">
+    <!-- Ambient glow -->
+    <ellipse cx="80" cy="130" rx="80" ry="90" fill="#f97316" opacity="0.06" filter="url(#bSoftGlow)"/>
+
+    <!-- Tail flames -->
+    <path d="M68 190 C62 210, 52 235, 42 250 C50 238, 60 220, 66 200Z" fill="url(#bTail)" opacity="0.7" filter="url(#bGlow)"/>
+    <path d="M80 192 C80 215, 78 238, 75 255 C79 238, 80 215, 80 198Z" fill="url(#bTail)" opacity="0.8" filter="url(#bGlow)"/>
+    <path d="M92 190 C98 210, 108 235, 118 250 C110 238, 100 220, 94 200Z" fill="url(#bTail)" opacity="0.7" filter="url(#bGlow)"/>
+
+    <!-- Left wing -->
+    <path d="M65 105 C50 88, 20 70, 5 55 C12 65, 25 78, 35 88 C22 82, 8 72, 0 62 C10 78, 25 90, 40 98 C25 95, 10 90, 0 82 C12 94, 30 103, 48 107 C38 110, 25 112, 15 108 C28 115, 45 118, 58 115 C52 125, 53 145, 58 165 C57 148, 60 122, 65 105Z"
+      fill="url(#bWingL)" opacity="0.9"/>
+
+    <!-- Right wing -->
+    <path d="M95 105 C110 88, 140 70, 155 55 C148 65, 135 78, 125 88 C138 82, 152 72, 160 62 C150 78, 135 90, 120 98 C135 95, 150 90, 160 82 C148 94, 130 103, 112 107 C122 110, 135 112, 145 108 C132 115, 115 118, 102 115 C108 125, 107 145, 102 165 C103 148, 100 122, 95 105Z"
+      fill="url(#bWingR)" opacity="0.9"/>
+
+    <!-- Body -->
+    <path d="M80 62 C90 68, 100 82, 101 100 C102 115, 99 130, 96 148 C93 160, 87 170, 80 178 C73 170, 67 160, 64 148 C61 130, 58 115, 59 100 C60 82, 70 68, 80 62Z"
+      fill="url(#bFlame)"/>
+
+    <!-- Chest -->
+    <path d="M80 88 C88 93, 94 105, 94 118 C94 130, 91 142, 87 154 C84 160, 82 163, 80 165 C78 163, 76 160, 73 154 C69 142, 66 130, 66 118 C66 105, 72 93, 80 88Z"
+      fill="url(#bChest)" opacity="0.8"/>
+
+    <!-- Head -->
+    <ellipse cx="80" cy="68" rx="15" ry="14" fill="#f97316"/>
+    <ellipse cx="80" cy="70" rx="11" ry="10" fill="#fb923c" opacity="0.5"/>
+
+    <!-- Crest -->
+    <path d="M80 55 C79 42, 73 32, 68 25 C74 35, 78 45, 79 53Z" fill="url(#bCrest)" filter="url(#bGlow)"/>
+    <path d="M80 55 C80 40, 80 28, 80 18 C80 30, 80 43, 80 53Z" fill="url(#bCrest)" filter="url(#bGlow)"/>
+    <path d="M80 55 C81 42, 87 32, 92 25 C86 35, 82 45, 81 53Z" fill="url(#bCrest)" filter="url(#bGlow)"/>
+
+    <!-- Eyes -->
+    <ellipse cx="74" cy="66" rx="3" ry="3.2" fill="#0e0e10"/>
+    <ellipse cx="86" cy="66" rx="3" ry="3.2" fill="#0e0e10"/>
+    <ellipse cx="74.5" cy="65" rx="1.3" ry="1.5" fill="#fef3c7" opacity="0.9"/>
+    <ellipse cx="86.5" cy="65" rx="1.3" ry="1.5" fill="#fef3c7" opacity="0.9"/>
+
+    <!-- Beak -->
+    <path d="M77 73 L80 80 L83 73 Z" fill="#c2410c"/>
+
+    <!-- Embers -->
+    <circle cx="18" cy="52" r="1.8" fill="#fbbf24" opacity="0.6" filter="url(#bGlow)"/>
+    <circle cx="142" cy="55" r="1.5" fill="#fde68a" opacity="0.5" filter="url(#bGlow)"/>
+    <circle cx="38" cy="40" r="1" fill="#fef3c7" opacity="0.4"/>
+    <circle cx="125" cy="42" r="1.2" fill="#fbbf24" opacity="0.4"/>
+  </g>
+
+  <!-- FORGE text -->
+  <text x="265" y="148" fill="url(#textGrad)" font-family="'Inter', 'SF Pro Display', -apple-system, sans-serif" font-size="90" font-weight="800" letter-spacing="-2">FORGE</text>
+
+  <!-- Tagline -->
+  <text x="270" y="188" fill="#71717a" font-family="'Inter', 'SF Pro Display', -apple-system, sans-serif" font-size="22" font-weight="500">The developer platform for Claude Code</text>
+
+  <!-- Accent line -->
+  <rect x="100" y="220" width="1000" height="1" fill="url(#accentLine)" opacity="0.25"/>
+
+  <!-- Feature pills -->
+  <g font-family="'SF Mono', 'Fira Code', monospace" font-size="11.5" font-weight="500">
+    <rect x="270" y="240" width="148" height="26" rx="13" fill="#f97316" opacity="0.1" stroke="#f97316" stroke-opacity="0.2" stroke-width="0.5"/>
+    <text x="344" y="257" text-anchor="middle" fill="#f97316">Multi-Session</text>
+
+    <rect x="432" y="240" width="138" height="26" rx="13" fill="#22c55e" opacity="0.1" stroke="#22c55e" stroke-opacity="0.2" stroke-width="0.5"/>
+    <text x="501" y="257" text-anchor="middle" fill="#22c55e">Cost Tracking</text>
+
+    <rect x="584" y="240" width="130" height="26" rx="13" fill="#3b82f6" opacity="0.1" stroke="#3b82f6" stroke-opacity="0.2" stroke-width="0.5"/>
+    <text x="649" y="257" text-anchor="middle" fill="#3b82f6">Permissions</text>
+
+    <rect x="728" y="240" width="152" height="26" rx="13" fill="#a855f7" opacity="0.1" stroke="#a855f7" stroke-opacity="0.2" stroke-width="0.5"/>
+    <text x="804" y="257" text-anchor="middle" fill="#a855f7">Agent Architect</text>
+
+    <rect x="894" y="240" width="142" height="26" rx="13" fill="#eab308" opacity="0.1" stroke="#eab308" stroke-opacity="0.2" stroke-width="0.5"/>
+    <text x="965" y="257" text-anchor="middle" fill="#eab308">Prompt Library</text>
+  </g>
+
+  <!-- Version pill bottom right -->
+  <rect x="1080" y="285" width="90" height="22" rx="11" fill="#27272a"/>
+  <text x="1125" y="300" text-anchor="middle" fill="#71717a" font-family="'SF Mono', monospace" font-size="10" font-weight="600">v1.0.0</text>
+</svg>

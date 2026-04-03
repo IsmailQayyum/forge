@@ -1,20 +1,144 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
-  <rect width="120" height="120" rx="24" fill="#0e0e10"/>
-  <rect x="4" y="4" width="112" height="112" rx="20" fill="#18181b" stroke="#27272a" stroke-width="1"/>
-  <!-- Anvil base -->
-  <path d="M30 82 L90 82 L95 90 L25 90 Z" fill="#f97316"/>
-  <!-- Anvil body -->
-  <path d="M35 62 L85 62 L90 82 L30 82 Z" fill="#f97316" opacity="0.85"/>
-  <!-- Anvil horn -->
-  <path d="M85 62 L105 55 L105 62 L85 66 Z" fill="#f97316" opacity="0.7"/>
-  <!-- Hammer -->
-  <rect x="52" y="24" width="6" height="32" rx="2" fill="#e4e4e7" transform="rotate(-15 55 40)"/>
-  <rect x="42" y="22" width="26" height="10" rx="3" fill="#f97316" transform="rotate(-15 55 27)"/>
-  <!-- Sparks -->
-  <circle cx="38" cy="56" r="2" fill="#facc15" opacity="0.9"/>
-  <circle cx="44" cy="50" r="1.5" fill="#facc15" opacity="0.7"/>
-  <circle cx="32" cy="52" r="1" fill="#fde68a" opacity="0.8"/>
-  <circle cx="48" cy="44" r="1.5" fill="#fde68a" opacity="0.6"/>
-  <!-- Terminal prompt hint -->
-  <text x="60" y="106" text-anchor="middle" fill="#3f3f46" font-family="monospace" font-size="9" font-weight="600">&gt;_ FORGE</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="400" y2="400">
+      <stop offset="0%" stop-color="#18181b"/>
+      <stop offset="100%" stop-color="#0e0e10"/>
+    </linearGradient>
+    <linearGradient id="bodyMain" x1="200" y1="60" x2="200" y2="320">
+      <stop offset="0%" stop-color="#fde68a"/>
+      <stop offset="25%" stop-color="#f97316"/>
+      <stop offset="60%" stop-color="#ea580c"/>
+      <stop offset="100%" stop-color="#c2410c"/>
+    </linearGradient>
+    <linearGradient id="wingLeft" x1="60" y1="100" x2="180" y2="250">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="50%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#dc2626"/>
+    </linearGradient>
+    <linearGradient id="wingRight" x1="220" y1="100" x2="340" y2="250">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="50%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#dc2626"/>
+    </linearGradient>
+    <linearGradient id="chest" x1="200" y1="160" x2="200" y2="280">
+      <stop offset="0%" stop-color="#fef3c7"/>
+      <stop offset="50%" stop-color="#fde68a"/>
+      <stop offset="100%" stop-color="#fbbf24"/>
+    </linearGradient>
+    <linearGradient id="tailFlame" x1="200" y1="280" x2="200" y2="370">
+      <stop offset="0%" stop-color="#f97316"/>
+      <stop offset="40%" stop-color="#ef4444"/>
+      <stop offset="100%" stop-color="#dc2626" stop-opacity="0.3"/>
+    </linearGradient>
+    <linearGradient id="crest" x1="200" y1="50" x2="200" y2="100">
+      <stop offset="0%" stop-color="#fef3c7"/>
+      <stop offset="100%" stop-color="#f97316"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="softGlow">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="400" height="400" rx="48" fill="url(#bg)"/>
+  <rect x="2" y="2" width="396" height="396" rx="46" fill="none" stroke="#27272a" stroke-width="1"/>
+
+  <!-- Ambient glow behind phoenix -->
+  <ellipse cx="200" cy="200" rx="120" ry="140" fill="#f97316" opacity="0.06" filter="url(#softGlow)"/>
+
+  <!-- Tail flames (behind body) -->
+  <path d="M180 280 C170 310, 155 340, 140 365 C150 350, 165 330, 175 300 C168 325, 155 355, 148 370 C160 350, 172 320, 180 290Z" fill="url(#tailFlame)" opacity="0.7" filter="url(#glow)"/>
+  <path d="M200 285 C200 315, 195 345, 190 370 C198 350, 202 325, 200 300 C205 330, 208 355, 210 370 C205 345, 200 315, 200 290Z" fill="url(#tailFlame)" opacity="0.8" filter="url(#glow)"/>
+  <path d="M220 280 C230 310, 245 340, 260 365 C250 350, 235 330, 225 300 C232 325, 245 355, 252 370 C240 350, 228 320, 220 290Z" fill="url(#tailFlame)" opacity="0.7" filter="url(#glow)"/>
+
+  <!-- Left wing (behind) -->
+  <path d="M170 160
+    C140 130, 80 100, 45 75
+    C55 95, 75 115, 95 135
+    C70 125, 40 110, 28 95
+    C40 120, 65 140, 90 155
+    C65 148, 38 138, 25 125
+    C42 148, 70 162, 100 170
+    C80 172, 55 168, 35 158
+    C55 175, 85 185, 115 185
+    C100 192, 82 195, 65 190
+    C85 200, 108 205, 135 200
+    C128 210, 140 230, 155 250
+    C150 225, 155 195, 170 160Z"
+    fill="url(#wingLeft)" opacity="0.9"/>
+
+  <!-- Right wing (behind) -->
+  <path d="M230 160
+    C260 130, 320 100, 355 75
+    C345 95, 325 115, 305 135
+    C330 125, 360 110, 372 95
+    C360 120, 335 140, 310 155
+    C335 148, 362 138, 375 125
+    C358 148, 330 162, 300 170
+    C320 172, 345 168, 365 158
+    C345 175, 315 185, 285 185
+    C300 192, 318 195, 335 190
+    C315 200, 292 205, 265 200
+    C272 210, 260 230, 245 250
+    C250 225, 245 195, 230 160Z"
+    fill="url(#wingRight)" opacity="0.9"/>
+
+  <!-- Body -->
+  <path d="M200 95
+    C220 105, 240 130, 242 160
+    C244 185, 238 210, 232 235
+    C226 255, 215 270, 200 280
+    C185 270, 174 255, 168 235
+    C162 210, 156 185, 158 160
+    C160 130, 180 105, 200 95Z"
+    fill="url(#bodyMain)"/>
+
+  <!-- Chest/belly -->
+  <path d="M200 140
+    C215 148, 225 165, 226 185
+    C227 205, 222 225, 215 245
+    C210 258, 205 262, 200 265
+    C195 262, 190 258, 185 245
+    C178 225, 173 205, 174 185
+    C175 165, 185 148, 200 140Z"
+    fill="url(#chest)" opacity="0.85"/>
+
+  <!-- Head -->
+  <ellipse cx="200" cy="105" rx="24" ry="22" fill="#f97316"/>
+  <ellipse cx="200" cy="108" rx="18" ry="16" fill="#fb923c" opacity="0.6"/>
+
+  <!-- Head crest feathers -->
+  <path d="M200 85 C198 65, 188 48, 180 38 C190 52, 195 68, 197 82Z" fill="url(#crest)" filter="url(#glow)"/>
+  <path d="M200 85 C202 60, 200 42, 200 30 C200 45, 200 65, 200 82Z" fill="url(#crest)" filter="url(#glow)"/>
+  <path d="M200 85 C202 65, 212 48, 220 38 C210 52, 205 68, 203 82Z" fill="url(#crest)" filter="url(#glow)"/>
+
+  <!-- Eyes -->
+  <ellipse cx="190" cy="102" rx="4.5" ry="5" fill="#0e0e10"/>
+  <ellipse cx="210" cy="102" rx="4.5" ry="5" fill="#0e0e10"/>
+  <ellipse cx="191" cy="100.5" rx="2" ry="2.2" fill="#fef3c7" opacity="0.9"/>
+  <ellipse cx="211" cy="100.5" rx="2" ry="2.2" fill="#fef3c7" opacity="0.9"/>
+
+  <!-- Beak -->
+  <path d="M196 110 L200 120 L204 110 Z" fill="#c2410c"/>
+  <path d="M196 110 L200 115 L204 110 Z" fill="#ea580c"/>
+
+  <!-- Wing edge highlights -->
+  <path d="M45 75 C55 93, 73 112, 93 132" stroke="#fde68a" stroke-width="1" opacity="0.4" fill="none"/>
+  <path d="M355 75 C345 93, 327 112, 307 132" stroke="#fde68a" stroke-width="1" opacity="0.4" fill="none"/>
+
+  <!-- Floating embers -->
+  <circle cx="80" cy="85" r="2.5" fill="#fbbf24" opacity="0.6" filter="url(#glow)"/>
+  <circle cx="320" cy="90" r="2" fill="#fde68a" opacity="0.5" filter="url(#glow)"/>
+  <circle cx="110" cy="65" r="1.5" fill="#fef3c7" opacity="0.5"/>
+  <circle cx="290" cy="68" r="1.8" fill="#fbbf24" opacity="0.4"/>
+  <circle cx="150" cy="55" r="1.2" fill="#fde68a" opacity="0.4"/>
+  <circle cx="255" cy="52" r="1.5" fill="#fef3c7" opacity="0.35"/>
+
+  <!-- FORGE text -->
+  <text x="200" y="365" text-anchor="middle" fill="#52525b" font-family="'SF Mono', 'Fira Code', monospace" font-size="18" font-weight="700" letter-spacing="8">FORGE</text>
 </svg>
