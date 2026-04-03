@@ -48,6 +48,58 @@ app.use("/api/notifications", notificationsRouter);
 app.get("/api/quick-actions", (_, res) => res.json(getQuickActions()));
 app.get("/api/health", (_, res) => res.json({ ok: true, version: "1.0.0" }));
 
+// Filesystem browse API
+import fs from "fs";
+import os from "os";
+app.get("/api/fs/browse", (req, res) => {
+  const dir = req.query.path || os.homedir();
+  try {
+    const resolved = path.resolve(dir.replace(/^~/, os.homedir()));
+    const entries = fs.readdirSync(resolved, { withFileTypes: true });
+    const dirs = entries
+      .filter(e => e.isDirectory() && !e.name.startsWith("."))
+      .map(e => ({ name: e.name, path: path.join(resolved, e.name) }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    res.json({ current: resolved, parent: path.dirname(resolved), dirs });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Recent projects (directories that have .git or CLAUDE.md)
+app.get("/api/fs/projects", (req, res) => {
+  const searchDirs = [
+    os.homedir(),
+    path.join(os.homedir(), "Documents"),
+    path.join(os.homedir(), "Projects"),
+    path.join(os.homedir(), "Developer"),
+    path.join(os.homedir(), "Code"),
+    path.join(os.homedir(), "code"),
+    path.join(os.homedir(), "work"),
+    path.join(os.homedir(), "Documents", "work"),
+  ];
+  const projects = [];
+  for (const dir of searchDirs) {
+    try {
+      if (!fs.existsSync(dir)) continue;
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const e of entries) {
+        if (!e.isDirectory() || e.name.startsWith(".")) continue;
+        const full = path.join(dir, e.name);
+        const hasGit = fs.existsSync(path.join(full, ".git"));
+        const hasClaude = fs.existsSync(path.join(full, "CLAUDE.md"));
+        if (hasGit || hasClaude) {
+          projects.push({ name: e.name, path: full, hasGit, hasClaude });
+        }
+      }
+    } catch {}
+  }
+  // Deduplicate by path
+  const seen = new Set();
+  const unique = projects.filter(p => { if (seen.has(p.path)) return false; seen.add(p.path); return true; });
+  res.json(unique.slice(0, 50));
+});
+
 // Terminal API
 app.post("/api/terminal/spawn", (req, res) => {
   const { cwd, args, shell } = req.body;

@@ -1,15 +1,16 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useForgeStore } from "../../store/index.js";
 import { XTerminal } from "./XTerminal.jsx";
-import { MultiSession } from "./MultiSession.jsx";
 import {
-  MessageSquare, Send, Bot, User, Shield, ShieldCheck, ShieldX,
-  Terminal, FileText, Edit, Search, Users, Zap, ChevronDown, ChevronRight,
-  AlertCircle, Clock, CheckCircle2, XCircle, Plus, Play, Square,
-  FolderOpen, TerminalSquare, List, Grid2X2,
+  Terminal, Play, Plus, X, FolderOpen, ChevronRight, ChevronDown,
+  Folder, Home, ArrowUp, Shield, ShieldCheck, ShieldX,
+  RotateCcw, Maximize2, Minimize2, PanelRightOpen, PanelRightClose,
+  Zap, FileText, Edit, Search, Users, Clock, AlertCircle, CheckCircle2,
+  Bot, User, Send,
 } from "lucide-react";
 import clsx from "clsx";
 
+// ── Tool icon/color maps for activity panel ──
 const TOOL_ICONS = {
   Read: FileText, Write: Edit, Edit: Edit, Bash: Terminal,
   Grep: Search, Glob: Search, Task: Users, Agent: Users,
@@ -21,34 +22,22 @@ const TOOL_COLORS = {
 };
 
 export function Messenger() {
-  const sessions = useForgeStore((s) => Object.values(s.sessions));
+  // ── State ──
+  const [terminals, setTerminals] = useState([]); // { id, terminalId, label, cwd, status, pid }
+  const [activeTermId, setActiveTermId] = useState(null);
+  const [spawning, setSpawning] = useState(false);
+  const [autoApprove, setAutoApprove] = useState(false);
+  const [showBrowser, setShowBrowser] = useState(false);
+  const [showActivity, setShowActivity] = useState(false);
+  const [cwdInput, setCwdInput] = useState("");
+  const wsRef = useRef(null);
+
+  // Store data
   const pendingPermissions = useForgeStore((s) => s.pendingPermissions);
   const sessionEvents = useForgeStore((s) => s.sessionEvents);
-  const pendingInputs = useForgeStore((s) => s.pendingInputs);
-  const removePendingInput = useForgeStore((s) => s.removePendingInput);
-  const updateSession = useForgeStore((s) => s.updateSession);
 
-  const [selectedId, setSelectedId] = useState(null);
-  const [activeTerminals, setActiveTerminals] = useState({}); // sessionId or termId -> termId
-  const [forgeTerminals, setForgeTerminals] = useState([]); // terminals spawned from Forge
-  const [tab, setTab] = useState("terminal"); // "terminal" | "events"
-  const [cwdInput, setCwdInput] = useState("");
-  const [autoApprove, setAutoApprove] = useState(false);
-  const [spawning, setSpawning] = useState(false);
-  const [reply, setReply] = useState("");
-  const [copied, setCopied] = useState(false);
-  const wsRef = useRef(null);
-  const bottomRef = useRef(null);
-
-  const selected = sessions.find((s) => s.id === selectedId) || sessions[0];
-  const events = selected ? (sessionEvents[selected.id] || []) : [];
-  const sessionPerms = pendingPermissions.filter((p) => p.sessionId === selected?.id);
-  const isPending = pendingInputs.some((p) => p.sessionId === selected?.id);
-
-  // Find or track WS reference
+  // ── WS reference ──
   useEffect(() => {
-    // Grab the global WS from the store's connection
-    // We'll access it via window.__forgeWs set by useWebSocket
     const interval = setInterval(() => {
       if (window.__forgeWs && window.__forgeWs.readyState === 1) {
         wsRef.current = window.__forgeWs;
@@ -57,16 +46,27 @@ export function Messenger() {
     return () => clearInterval(interval);
   }, []);
 
-  // Check for the active terminal tied to a selected session
-  const currentTerminalId = selected ? activeTerminals[selected.id] : null;
-  // Also check for standalone Forge terminals
-  const standaloneTermId = forgeTerminals.find(t => !t.sessionId)?.terminalId;
-
+  // ── Listen for terminal exits ──
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [events.length]);
+    function handleWs(event) {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === "TERMINAL_EXIT") {
+          setTerminals(prev => prev.map(t =>
+            t.terminalId === msg.terminalId ? { ...t, status: "exited" } : t
+          ));
+        }
+      } catch {}
+    }
+    const ws = wsRef.current;
+    if (ws) {
+      ws.addEventListener("message", handleWs);
+      return () => ws.removeEventListener("message", handleWs);
+    }
+  }, [wsRef.current]);
 
-  async function spawnClaude(cwd) {
+  // ── Spawn ──
+  async function spawnSession(cwd, label) {
     setSpawning(true);
     try {
       const args = autoApprove ? ["--dangerously-skip-permissions"] : [];
@@ -76,63 +76,41 @@ export function Messenger() {
         body: JSON.stringify({ cwd: cwd || undefined, args }),
       });
       const data = await res.json();
-      if (data.terminalId) {
-        const termId = data.terminalId;
-        setForgeTerminals(prev => [...prev, { terminalId: termId, cwd, createdAt: Date.now() }]);
-        // If we have a selected session, link it
-        if (selected) {
-          setActiveTerminals(prev => ({ ...prev, [selected.id]: termId }));
-        } else {
-          // Create a virtual session entry for this terminal
-          setActiveTerminals(prev => ({ ...prev, [`forge-${termId}`]: termId }));
-        }
-        setTab("terminal");
+      if (data.error) {
+        console.error("Spawn error:", data.error);
+      } else if (data.terminalId) {
+        const entry = {
+          id: data.terminalId,
+          terminalId: data.terminalId,
+          label: label || cwd?.split("/").pop() || `Session ${terminals.length + 1}`,
+          cwd: cwd || "~",
+          status: "active",
+          pid: data.pid,
+          createdAt: Date.now(),
+        };
+        setTerminals(prev => [...prev, entry]);
+        setActiveTermId(data.terminalId);
+        setShowBrowser(false);
       }
     } catch (err) {
-      console.error("Failed to spawn Claude:", err);
+      console.error("Failed to spawn:", err);
     }
     setSpawning(false);
   }
 
-  async function sendReply() {
-    if (!reply.trim() || !selected) return;
-    const text = reply.trim();
+  async function killSession(terminalId) {
+    await fetch(`/api/terminal/${terminalId}/kill`, { method: "POST" });
+    setTerminals(prev => prev.map(t =>
+      t.terminalId === terminalId ? { ...t, status: "exited" } : t
+    ));
+  }
 
-    // Add to messages
-    updateSession(selected.id, {
-      messages: [...(selected.messages || []), {
-        id: `user-${Date.now()}`, role: "user", text, ts: Date.now(),
-      }],
-      waitingForInput: false,
-    });
-    useForgeStore.getState().addSessionEvent(selected.id, {
-      type: "message", role: "user", text, ts: Date.now(),
-    });
-
-    // Send via hooks API
-    fetch(`/api/hooks/send/${selected.id}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
-    });
-
-    // If there's an active terminal for this session, also write to it
-    const termId = activeTerminals[selected.id];
-    if (termId && wsRef.current?.readyState === 1) {
-      wsRef.current.send(JSON.stringify({
-        type: "TERMINAL_INPUT",
-        payload: { terminalId: termId, data: text + "\n" },
-      }));
+  function removeSession(terminalId) {
+    setTerminals(prev => prev.filter(t => t.terminalId !== terminalId));
+    if (activeTermId === terminalId) {
+      const remaining = terminals.filter(t => t.terminalId !== terminalId);
+      setActiveTermId(remaining[remaining.length - 1]?.terminalId || null);
     }
-
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 3000);
-    } catch {}
-
-    removePendingInput(selected.id);
-    setReply("");
   }
 
   async function handlePermission(permissionId, decision) {
@@ -143,482 +121,563 @@ export function Messenger() {
     });
   }
 
-  // Determine which terminal to show
-  const displayTerminalId = currentTerminalId || forgeTerminals[forgeTerminals.length - 1]?.terminalId;
+  const activeTerminal = terminals.find(t => t.terminalId === activeTermId);
+  const activeCount = terminals.filter(t => t.status === "active").length;
+  const permCount = pendingPermissions.length;
 
   return (
     <div className="flex h-full">
-      {/* Session sidebar */}
-      <div className="w-64 border-r border-forge-border flex flex-col">
-        <div className="px-4 py-3 border-b border-forge-border flex items-center gap-2">
-          <TerminalSquare size={14} className="text-forge-accent" />
-          <span className="text-sm font-semibold">Sessions</span>
-        </div>
-
-        {/* Spawn controls */}
-        <div className="p-2 border-b border-forge-border flex flex-col gap-1.5">
-          <div className="flex gap-1.5">
-            <input
-              value={cwdInput}
-              onChange={(e) => setCwdInput(e.target.value)}
-              placeholder="Working directory..."
-              className="flex-1 bg-forge-surface border border-forge-border rounded-md px-2 py-1.5 text-[11px] text-forge-text placeholder:text-forge-muted outline-none focus:border-forge-muted font-mono"
-            />
-            <button
-              onClick={() => spawnClaude(cwdInput)}
-              disabled={spawning}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-forge-accent text-white text-[11px] font-semibold hover:bg-orange-500 disabled:opacity-50 transition-colors shrink-0"
-            >
-              <Play size={10} />
-              {spawning ? "..." : "New"}
-            </button>
-          </div>
-          <label className="flex items-center gap-1.5 cursor-pointer">
-            <div
-              onClick={() => setAutoApprove(!autoApprove)}
-              className={clsx(
-                "w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors",
-                autoApprove ? "bg-forge-accent border-forge-accent" : "border-forge-border"
-              )}
-            >
-              {autoApprove && <svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-4" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" /></svg>}
-            </div>
-            <span className="text-[10px] text-forge-muted">Auto-approve (skip permissions)</span>
-          </label>
-        </div>
-
-        {/* Forge-spawned terminals */}
-        {forgeTerminals.length > 0 && (
-          <div className="border-b border-forge-border">
-            <div className="px-3 py-1.5">
-              <span className="text-[10px] text-forge-muted uppercase tracking-wider">Forge terminals</span>
-            </div>
-            {forgeTerminals.map((t) => (
+      {/* ── Main area ── */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* ── Tab bar ── */}
+        <div className="flex items-center border-b border-forge-border bg-forge-surface/50 shrink-0">
+          {/* Session tabs */}
+          <div className="flex-1 flex items-center overflow-x-auto">
+            {terminals.map(t => (
               <button
                 key={t.terminalId}
-                onClick={() => {
-                  setActiveTerminals(prev => ({...prev, _current: t.terminalId}));
-                  setTab("terminal");
-                }}
+                onClick={() => setActiveTermId(t.terminalId)}
                 className={clsx(
-                  "w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-forge-surface/50 transition-colors",
-                  displayTerminalId === t.terminalId && "bg-forge-accent-dim"
+                  "group flex items-center gap-1.5 px-3 py-2 text-[11px] border-r border-forge-border shrink-0 transition-colors relative",
+                  activeTermId === t.terminalId
+                    ? "bg-forge-bg text-forge-text"
+                    : "text-forge-muted hover:text-forge-text hover:bg-forge-bg/50"
                 )}
               >
-                <Terminal size={12} className="text-forge-green shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-mono text-forge-text truncate">{t.cwd || "~"}</p>
-                  <p className="text-[10px] text-forge-muted">{t.terminalId.slice(0, 12)}</p>
-                </div>
-                <span className="w-1.5 h-1.5 rounded-full bg-forge-green animate-pulse shrink-0" />
+                {/* Active indicator bar */}
+                {activeTermId === t.terminalId && (
+                  <div className="absolute top-0 left-0 right-0 h-0.5 bg-forge-accent" />
+                )}
+                <span className={clsx(
+                  "w-1.5 h-1.5 rounded-full shrink-0",
+                  t.status === "active" ? "bg-forge-green animate-pulse" : "bg-forge-muted"
+                )} />
+                <span className="font-medium max-w-[120px] truncate">{t.label}</span>
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    t.status === "active" ? killSession(t.terminalId) : removeSession(t.terminalId);
+                  }}
+                  className="ml-1 p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-forge-border transition-all cursor-pointer"
+                >
+                  <X size={9} />
+                </span>
               </button>
             ))}
-          </div>
-        )}
 
-        {/* Existing sessions (from JSONL watcher) */}
-        <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-1">
-          {sessions.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full gap-2 text-forge-muted">
-              <Terminal size={20} />
-              <p className="text-xs text-center px-4">
-                No sessions yet. Click "New" to start Claude Code, or start it in a terminal.
-              </p>
-            </div>
-          ) : (
-            sessions.map((s) => {
-              const hasPerm = pendingPermissions.some(p => p.sessionId === s.id);
-              const hasPending = pendingInputs.some(p => p.sessionId === s.id);
-              const hasTerminal = !!activeTerminals[s.id];
-              return (
-                <button
-                  key={s.id}
-                  onClick={() => setSelectedId(s.id)}
-                  className={clsx(
-                    "w-full text-left rounded-lg p-2.5 transition-colors border",
-                    selected?.id === s.id
-                      ? "bg-forge-accent-dim border-forge-accent"
-                      : "bg-forge-surface border-forge-border hover:border-forge-muted"
-                  )}
-                >
-                  <div className="flex items-center gap-2">
-                    <div className={clsx(
-                      "w-6 h-6 rounded-full flex items-center justify-center shrink-0",
-                      s.status === "active" ? "bg-forge-accent" : "bg-forge-border"
-                    )}>
-                      {hasTerminal
-                        ? <Terminal size={10} className="text-white" />
-                        : <Bot size={10} className={s.status === "active" ? "text-white" : "text-forge-muted"} />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1">
-                        <span className="text-[11px] font-semibold truncate">
-                          {s.displayName || s.project || s.id?.slice(0, 8)}
-                        </span>
-                        {hasPerm && <Shield size={9} className="text-forge-yellow animate-pulse shrink-0" />}
-                        {hasPending && <span className="w-1.5 h-1.5 rounded-full bg-forge-accent shrink-0" />}
-                      </div>
-                      <p className="text-[10px] text-forge-muted">{s.status}</p>
-                    </div>
-                  </div>
-                </button>
-              );
-            })
-          )}
-        </div>
-      </div>
-
-      {/* Main panel */}
-      <div className="flex-1 flex flex-col">
-        {/* Tabs + header */}
-        <div className="px-4 py-2 border-b border-forge-border flex items-center gap-4">
-          <div className="flex items-center gap-1 bg-forge-surface rounded-lg p-0.5">
+            {/* New tab button */}
             <button
-              onClick={() => setTab("terminal")}
-              className={clsx(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors",
-                tab === "terminal" ? "bg-forge-accent text-white" : "text-forge-muted hover:text-forge-text"
-              )}
+              onClick={() => setShowBrowser(true)}
+              className="flex items-center gap-1 px-2.5 py-2 text-forge-muted hover:text-forge-text transition-colors shrink-0"
+              title="New session"
             >
-              <Terminal size={11} />
-              Terminal
-            </button>
-            <button
-              onClick={() => setTab("multi")}
-              className={clsx(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors",
-                tab === "multi" ? "bg-forge-accent text-white" : "text-forge-muted hover:text-forge-text"
-              )}
-            >
-              <Grid2X2 size={11} />
-              Multi
-            </button>
-            <button
-              onClick={() => setTab("events")}
-              className={clsx(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors",
-                tab === "events" ? "bg-forge-accent text-white" : "text-forge-muted hover:text-forge-text"
-              )}
-            >
-              <List size={11} />
-              Events
-              {sessionPerms.length > 0 && (
-                <span className="w-4 h-4 rounded-full bg-forge-yellow text-[9px] text-forge-bg flex items-center justify-center font-bold">
-                  {sessionPerms.length}
-                </span>
-              )}
+              <Plus size={12} />
             </button>
           </div>
 
-          {selected && (
-            <div className="flex items-center gap-2 ml-2">
-              <span className={clsx(
-                "w-1.5 h-1.5 rounded-full",
-                selected.status === "active" ? "bg-forge-green animate-pulse" : "bg-forge-muted"
-              )} />
-              <span className="text-xs text-forge-text font-semibold">
-                {selected.displayName || selected.project || selected.id?.slice(0, 8)}
-              </span>
-              <span className="text-[10px] text-forge-muted">{selected.status}</span>
-            </div>
-          )}
-
-          {(isPending || sessionPerms.length > 0) && (
-            <div className="ml-auto flex items-center gap-1.5 bg-forge-accent-dim border border-forge-accent rounded-full px-3 py-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-forge-accent animate-pulse" />
-              <span className="text-[11px] text-forge-accent font-semibold">
-                {sessionPerms.length > 0 ? "Permission needed" : "Waiting for input"}
-              </span>
-            </div>
-          )}
+          {/* Right controls */}
+          <div className="flex items-center gap-1 px-2 shrink-0 border-l border-forge-border">
+            {activeCount > 0 && (
+              <span className="text-[10px] text-forge-muted mr-1">{activeCount} active</span>
+            )}
+            {permCount > 0 && (
+              <div className="flex items-center gap-1 bg-forge-yellow/15 border border-forge-yellow/30 rounded-full px-2 py-0.5 mr-1">
+                <Shield size={10} className="text-forge-yellow" />
+                <span className="text-[10px] text-forge-yellow font-semibold">{permCount}</span>
+              </div>
+            )}
+            <button
+              onClick={() => setShowActivity(!showActivity)}
+              className={clsx(
+                "p-1.5 rounded-md transition-colors",
+                showActivity ? "bg-forge-accent text-white" : "text-forge-muted hover:text-forge-text hover:bg-forge-border"
+              )}
+              title="Activity panel"
+            >
+              {showActivity ? <PanelRightClose size={13} /> : <PanelRightOpen size={13} />}
+            </button>
+          </div>
         </div>
 
-        {/* Content — all tabs always mounted, hidden via CSS to preserve terminal state */}
-        <div className={clsx("flex-1 flex flex-col overflow-hidden", tab !== "terminal" && "hidden")}>
-          {displayTerminalId ? (
-            <XTerminal
-              terminalId={displayTerminalId}
-              wsRef={wsRef}
+        {/* ── Terminal content ── */}
+        <div className="flex-1 relative overflow-hidden">
+          {terminals.length === 0 ? (
+            <EmptyState
+              onSpawn={spawnSession}
+              spawning={spawning}
+              autoApprove={autoApprove}
+              setAutoApprove={setAutoApprove}
+              showBrowser={showBrowser}
+              setShowBrowser={setShowBrowser}
+              cwdInput={cwdInput}
+              setCwdInput={setCwdInput}
             />
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center gap-4 text-forge-muted">
-              <div className="w-16 h-16 rounded-2xl bg-forge-surface border border-forge-border flex items-center justify-center">
-                <Terminal size={28} className="text-forge-accent" />
-              </div>
-              <div className="text-center">
-                <p className="text-sm font-semibold text-forge-text mb-1">No terminal active</p>
-                <p className="text-xs text-forge-muted max-w-xs">
-                  Click "New" to spawn a Claude Code session, or select a session and switch to the Events tab to see its activity.
-                </p>
-              </div>
-              <div className="flex flex-col items-center gap-2">
-                <button
-                  onClick={() => spawnClaude(cwdInput)}
-                  disabled={spawning}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-forge-accent text-white text-xs font-semibold hover:bg-orange-500 disabled:opacity-50 transition-colors"
+            <>
+              {/* Render all terminals but only show active — preserves xterm state */}
+              {terminals.map(t => (
+                <div
+                  key={t.terminalId}
+                  className={clsx(
+                    "absolute inset-0",
+                    t.terminalId !== activeTermId && "hidden"
+                  )}
                 >
-                  <Play size={12} />
-                  Start Claude Code
-                </button>
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <div
-                    onClick={() => setAutoApprove(!autoApprove)}
-                    className={clsx(
-                      "w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors",
-                      autoApprove ? "bg-forge-accent border-forge-accent" : "border-forge-border"
-                    )}
-                  >
-                    {autoApprove && <svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-4" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" /></svg>}
-                  </div>
-                  <span className="text-[10px] text-forge-muted">Auto-approve (--dangerously-skip-permissions)</span>
-                </label>
-              </div>
-            </div>
+                  {t.status === "active" ? (
+                    <XTerminal terminalId={t.terminalId} wsRef={wsRef} />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full gap-3 text-forge-muted">
+                      <Terminal size={24} />
+                      <p className="text-xs">Session exited</p>
+                      <button
+                        onClick={() => { removeSession(t.terminalId); spawnSession(t.cwd, t.label); }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-forge-surface border border-forge-border text-xs hover:border-forge-muted transition-colors"
+                      >
+                        <RotateCcw size={10} /> Restart
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {/* Directory browser overlay */}
+              {showBrowser && (
+                <div className="absolute inset-0 z-10 bg-forge-bg/95 backdrop-blur-sm">
+                  <DirectoryBrowser
+                    onSelect={(dir) => spawnSession(dir, dir.split("/").pop())}
+                    onClose={() => setShowBrowser(false)}
+                    cwdInput={cwdInput}
+                    setCwdInput={setCwdInput}
+                    autoApprove={autoApprove}
+                    setAutoApprove={setAutoApprove}
+                    spawning={spawning}
+                  />
+                </div>
+              )}
+            </>
           )}
         </div>
 
-        <div className={clsx("flex-1 flex flex-col overflow-hidden", tab !== "multi" && "hidden")}>
-          <MultiSession wsRef={wsRef} />
-        </div>
-
-        <div className={clsx("flex-1 flex flex-col overflow-hidden", tab !== "events" && "hidden")}>
-          {/* Events tab — raw feed */}
-          <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2">
-            {events.length === 0 && (!selected?.messages || selected.messages.length === 0) ? (
-              <div className="flex flex-col items-center justify-center h-full gap-3 text-forge-muted">
-                <List size={28} />
-                <p className="text-xs">No events yet</p>
-              </div>
-            ) : (
-              <>
-                {events.length === 0 && selected?.messages?.map((msg) => (
-                  <MessageBubble key={msg.id} msg={msg} />
-                ))}
-                {events.map((event, i) => (
-                  <EventRow key={i} event={event} onPermission={handlePermission} />
-                ))}
-              </>
+        {/* ── Status bar ── */}
+        {activeTerminal && (
+          <div className="flex items-center gap-3 px-3 py-1 border-t border-forge-border bg-forge-surface/50 shrink-0">
+            <div className="flex items-center gap-1.5">
+              <span className={clsx(
+                "w-1.5 h-1.5 rounded-full",
+                activeTerminal.status === "active" ? "bg-forge-green" : "bg-forge-muted"
+              )} />
+              <span className="text-[10px] text-forge-muted">
+                {activeTerminal.status === "active" ? "Running" : "Exited"}
+              </span>
+            </div>
+            <span className="text-[10px] text-forge-muted font-mono">{activeTerminal.cwd}</span>
+            <span className="text-[10px] text-forge-muted">PID {activeTerminal.pid}</span>
+            {autoApprove && (
+              <span className="text-[10px] text-forge-yellow flex items-center gap-1">
+                <Zap size={8} /> Auto-approve
+              </span>
             )}
-            <div ref={bottomRef} />
+          </div>
+        )}
+      </div>
+
+      {/* ── Activity side panel ── */}
+      {showActivity && (
+        <ActivityPanel
+          permissions={pendingPermissions}
+          sessionEvents={sessionEvents}
+          onPermission={handlePermission}
+          onClose={() => setShowActivity(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+
+// ── Empty state with spawn options ──
+function EmptyState({ onSpawn, spawning, autoApprove, setAutoApprove, showBrowser, setShowBrowser, cwdInput, setCwdInput }) {
+  return (
+    <div className="flex items-center justify-center h-full">
+      {showBrowser ? (
+        <DirectoryBrowser
+          onSelect={(dir) => onSpawn(dir, dir.split("/").pop())}
+          onClose={() => setShowBrowser(false)}
+          cwdInput={cwdInput}
+          setCwdInput={setCwdInput}
+          autoApprove={autoApprove}
+          setAutoApprove={setAutoApprove}
+          spawning={spawning}
+        />
+      ) : (
+        <div className="flex flex-col items-center gap-5 max-w-sm">
+          <div className="w-16 h-16 rounded-2xl bg-forge-surface border border-forge-border flex items-center justify-center">
+            <Terminal size={28} className="text-forge-accent" />
+          </div>
+          <div className="text-center">
+            <p className="text-sm font-semibold text-forge-text mb-1">Start a Claude Code Session</p>
+            <p className="text-xs text-forge-muted">
+              Spawn Claude Code in any project directory. Full terminal experience with permission controls.
+            </p>
           </div>
 
-          {/* Quick reply for events tab */}
-          <div className="p-3 border-t border-forge-border">
-            {copied && (
-              <div className="mb-2 flex items-center gap-2 text-xs text-forge-green bg-forge-surface border border-forge-green/30 rounded-lg px-3 py-1.5">
-                <CheckCircle2 size={12} />
-                <span>Copied to clipboard</span>
-              </div>
-            )}
+          {/* Quick spawn */}
+          <div className="w-full flex flex-col gap-2">
             <div className="flex gap-2">
               <input
-                value={reply}
-                onChange={(e) => setReply(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendReply()}
-                placeholder={isPending ? "Agent is waiting for your reply..." : "Send a message..."}
-                className={clsx(
-                  "flex-1 bg-forge-surface border rounded-lg px-3 py-2 text-xs text-forge-text placeholder:text-forge-muted outline-none transition-colors font-mono",
-                  isPending ? "border-forge-accent" : "border-forge-border focus:border-forge-muted"
-                )}
+                value={cwdInput}
+                onChange={(e) => setCwdInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && cwdInput && onSpawn(cwdInput)}
+                placeholder="~/projects/my-app"
+                className="flex-1 bg-forge-surface border border-forge-border rounded-lg px-3 py-2 text-xs text-forge-text font-mono placeholder:text-forge-muted outline-none focus:border-forge-muted"
               />
               <button
-                onClick={sendReply}
-                disabled={!reply.trim()}
-                className="w-8 h-8 rounded-lg bg-forge-accent flex items-center justify-center disabled:opacity-40 hover:bg-orange-500 transition-colors"
+                onClick={() => setShowBrowser(true)}
+                className="px-2.5 rounded-lg bg-forge-surface border border-forge-border text-forge-muted hover:text-forge-text hover:border-forge-muted transition-colors"
+                title="Browse directories"
               >
-                <Send size={13} className="text-white" />
+                <FolderOpen size={14} />
               </button>
             </div>
+
+            <button
+              onClick={() => onSpawn(cwdInput)}
+              disabled={spawning}
+              className="w-full py-2.5 rounded-lg bg-forge-accent text-white text-xs font-semibold hover:bg-orange-500 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+            >
+              <Play size={12} />
+              {spawning ? "Starting..." : "Start Session"}
+            </button>
+
+            <label className="flex items-center gap-2 justify-center cursor-pointer">
+              <div
+                onClick={() => setAutoApprove(!autoApprove)}
+                className={clsx(
+                  "w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors cursor-pointer",
+                  autoApprove ? "bg-forge-accent border-forge-accent" : "border-forge-border"
+                )}
+              >
+                {autoApprove && <svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-4" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" /></svg>}
+              </div>
+              <span className="text-[10px] text-forge-muted">Auto-approve all tool calls</span>
+            </label>
           </div>
+
+          {/* Divider */}
+          <div className="w-full flex items-center gap-3">
+            <div className="flex-1 h-px bg-forge-border" />
+            <span className="text-[10px] text-forge-muted">or browse projects</span>
+            <div className="flex-1 h-px bg-forge-border" />
+          </div>
+
+          <button
+            onClick={() => setShowBrowser(true)}
+            className="w-full py-2.5 rounded-lg bg-forge-surface border border-forge-border text-xs text-forge-muted hover:text-forge-text hover:border-forge-muted transition-colors flex items-center justify-center gap-2"
+          >
+            <FolderOpen size={12} />
+            Browse Directories
+          </button>
         </div>
-      </div>
+      )}
     </div>
   );
 }
 
 
-// ── Event components ─────────────────────────────────────────────
+// ── Directory browser ──
+function DirectoryBrowser({ onSelect, onClose, cwdInput, setCwdInput, autoApprove, setAutoApprove, spawning }) {
+  const [currentPath, setCurrentPath] = useState("");
+  const [dirs, setDirs] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState("projects"); // "projects" | "browse"
 
-function EventRow({ event, onPermission }) {
-  switch (event.type) {
-    case "message": return <MessageBubble msg={event} />;
-    case "tool_call": return <ToolCallEvent event={event} />;
-    case "tool_result": return <ToolResultEvent event={event} />;
-    case "tool_done": return null;
-    case "permission_request": return <PermissionEvent event={event} onDecide={onPermission} />;
-    case "permission_decided": return <PermissionDecidedEvent event={event} />;
-    case "waiting": return <WaitingEvent event={event} />;
-    case "status": return <StatusEvent event={event} />;
-    case "subagent": return <SubAgentEvent event={event} />;
-    default: return null;
+  // Load projects on mount
+  useEffect(() => {
+    fetch("/api/fs/projects")
+      .then(r => r.json())
+      .then(data => {
+        setProjects(Array.isArray(data) ? data : []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  async function browseTo(dirPath) {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/fs/browse?path=${encodeURIComponent(dirPath || "~")}`);
+      const data = await res.json();
+      if (data.error) return;
+      setCurrentPath(data.current);
+      setDirs(data.dirs);
+      setCwdInput(data.current);
+      setTab("browse");
+    } catch {}
+    setLoading(false);
   }
-}
-
-function MessageBubble({ msg }) {
-  const isUser = msg.role === "user";
-  return (
-    <div className={clsx("flex gap-2 fade-in", isUser && "flex-row-reverse")}>
-      <div className={clsx(
-        "w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5",
-        isUser ? "bg-forge-border" : "bg-forge-accent"
-      )}>
-        {isUser ? <User size={11} className="text-forge-text" /> : <Bot size={11} className="text-white" />}
-      </div>
-      <div className={clsx(
-        "max-w-[80%] rounded-xl px-3 py-2 text-xs leading-relaxed",
-        isUser
-          ? "bg-forge-accent text-white rounded-tr-none"
-          : "bg-forge-surface border border-forge-border text-forge-text rounded-tl-none"
-      )}>
-        <pre className="whitespace-pre-wrap font-sans">{msg.text}</pre>
-      </div>
-    </div>
-  );
-}
-
-function ToolCallEvent({ event }) {
-  const [expanded, setExpanded] = useState(false);
-  const Icon = TOOL_ICONS[event.tool] || Zap;
-  const color = TOOL_COLORS[event.tool] || "text-forge-muted";
-  const preview = typeof event.input === "object"
-    ? Object.values(event.input || {})[0] : event.input;
-  const previewStr = typeof preview === "string" ? preview.slice(0, 120) : JSON.stringify(event.input)?.slice(0, 120);
 
   return (
-    <div className="fade-in">
-      <button onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-start gap-2 bg-forge-surface/60 border border-forge-border rounded-lg px-3 py-2 hover:border-forge-muted transition-colors text-left">
-        <Icon size={13} className={clsx("mt-0.5 shrink-0", color)} />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className={clsx("text-xs font-semibold", color)}>{event.tool}</span>
-            {event.status === "running" && <span className="w-1.5 h-1.5 rounded-full bg-forge-green animate-pulse" />}
+    <div className="flex flex-col w-full max-w-lg mx-auto h-full max-h-[500px] p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-semibold text-forge-text">Choose Project Directory</h3>
+        <button onClick={onClose} className="p-1 rounded-md text-forge-muted hover:text-forge-text hover:bg-forge-border transition-colors">
+          <X size={14} />
+        </button>
+      </div>
+
+      {/* Path input + go */}
+      <div className="flex gap-2 mb-3">
+        <input
+          value={cwdInput}
+          onChange={(e) => setCwdInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              if (e.shiftKey || e.metaKey) onSelect(cwdInput);
+              else browseTo(cwdInput);
+            }
+          }}
+          placeholder="Enter path or browse below..."
+          className="flex-1 bg-forge-surface border border-forge-border rounded-lg px-3 py-2 text-xs text-forge-text font-mono placeholder:text-forge-muted outline-none focus:border-forge-muted"
+        />
+        <button
+          onClick={() => onSelect(cwdInput)}
+          disabled={!cwdInput || spawning}
+          className="px-3 py-2 rounded-lg bg-forge-accent text-white text-[11px] font-semibold hover:bg-orange-500 disabled:opacity-40 transition-colors flex items-center gap-1.5"
+        >
+          <Play size={10} />
+          {spawning ? "..." : "Start"}
+        </button>
+      </div>
+
+      {/* Auto-approve */}
+      <label className="flex items-center gap-2 mb-3 cursor-pointer">
+        <div
+          onClick={() => setAutoApprove(!autoApprove)}
+          className={clsx(
+            "w-3 h-3 rounded border flex items-center justify-center transition-colors cursor-pointer",
+            autoApprove ? "bg-forge-accent border-forge-accent" : "border-forge-border"
+          )}
+        >
+          {autoApprove && <svg width="6" height="6" viewBox="0 0 8 8"><path d="M1 4l2 2 4-4" stroke="white" strokeWidth="2" fill="none" strokeLinecap="round" /></svg>}
+        </div>
+        <span className="text-[10px] text-forge-muted">Auto-approve</span>
+      </label>
+
+      {/* Tabs */}
+      <div className="flex items-center gap-1 mb-3">
+        <button
+          onClick={() => setTab("projects")}
+          className={clsx("px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors",
+            tab === "projects" ? "bg-forge-accent text-white" : "text-forge-muted hover:text-forge-text"
+          )}
+        >
+          Projects
+        </button>
+        <button
+          onClick={() => { setTab("browse"); if (!currentPath) browseTo("~"); }}
+          className={clsx("px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors",
+            tab === "browse" ? "bg-forge-accent text-white" : "text-forge-muted hover:text-forge-text"
+          )}
+        >
+          Browse
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto rounded-lg border border-forge-border bg-forge-surface">
+        {loading ? (
+          <div className="flex items-center justify-center h-full text-forge-muted text-xs">Loading...</div>
+        ) : tab === "projects" ? (
+          projects.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full gap-2 text-forge-muted p-4">
+              <Folder size={20} />
+              <p className="text-xs text-center">No projects found. Try browsing manually.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-forge-border">
+              {projects.map(p => (
+                <button
+                  key={p.path}
+                  onClick={() => { setCwdInput(p.path); onSelect(p.path); }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-forge-bg transition-colors text-left"
+                >
+                  <Folder size={14} className="text-forge-accent shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-forge-text">{p.name}</p>
+                    <p className="text-[10px] text-forge-muted font-mono truncate">{p.path}</p>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {p.hasGit && <span className="text-[9px] bg-forge-border text-forge-muted rounded px-1.5 py-0.5">git</span>}
+                    {p.hasClaude && <span className="text-[9px] bg-forge-accent/20 text-forge-accent rounded px-1.5 py-0.5">CLAUDE.md</span>}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )
+        ) : (
+          <div>
+            {/* Breadcrumb */}
+            {currentPath && (
+              <div className="flex items-center gap-1 px-3 py-2 border-b border-forge-border bg-forge-bg">
+                <button onClick={() => browseTo("~")} className="text-forge-muted hover:text-forge-text transition-colors">
+                  <Home size={11} />
+                </button>
+                <span className="text-[10px] text-forge-muted font-mono truncate">{currentPath}</span>
+                <button onClick={() => browseTo(currentPath + "/..")} className="ml-auto text-forge-muted hover:text-forge-text transition-colors" title="Go up">
+                  <ArrowUp size={11} />
+                </button>
+              </div>
+            )}
+            {/* Use this directory */}
+            {currentPath && (
+              <button
+                onClick={() => onSelect(currentPath)}
+                className="w-full flex items-center gap-2 px-3 py-2 text-forge-accent hover:bg-forge-accent/10 transition-colors border-b border-forge-border"
+              >
+                <Play size={10} />
+                <span className="text-[11px] font-semibold">Start session here</span>
+              </button>
+            )}
+            <div className="divide-y divide-forge-border/50">
+              {dirs.map(d => (
+                <button
+                  key={d.path}
+                  onClick={() => browseTo(d.path)}
+                  onDoubleClick={() => onSelect(d.path)}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-forge-bg transition-colors text-left"
+                >
+                  <Folder size={12} className="text-forge-muted shrink-0" />
+                  <span className="text-[11px] text-forge-text">{d.name}</span>
+                  <ChevronRight size={10} className="text-forge-muted ml-auto" />
+                </button>
+              ))}
+              {dirs.length === 0 && (
+                <p className="text-xs text-forge-muted text-center py-4">No subdirectories</p>
+              )}
+            </div>
           </div>
-          {previewStr && <p className="text-[11px] text-forge-muted mt-0.5 font-mono truncate">{previewStr}</p>}
-        </div>
-        {expanded ? <ChevronDown size={12} className="text-forge-muted mt-1" /> : <ChevronRight size={12} className="text-forge-muted mt-1" />}
-      </button>
-      {expanded && (
-        <div className="ml-5 mt-1 bg-forge-bg border border-forge-border rounded-lg p-3 overflow-x-auto">
-          <pre className="text-[10px] text-forge-muted font-mono whitespace-pre-wrap">{JSON.stringify(event.input, null, 2)}</pre>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ToolResultEvent({ event }) {
-  const [expanded, setExpanded] = useState(false);
-  const output = event.output || "";
-  const preview = typeof output === "string" ? output.slice(0, 120) : JSON.stringify(output).slice(0, 120);
-
-  return (
-    <div className="fade-in ml-5">
-      <button onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-start gap-2 bg-forge-surface/30 border border-forge-border/50 rounded-lg px-3 py-1.5 hover:border-forge-muted transition-colors text-left">
-        <CheckCircle2 size={11} className="text-forge-green mt-0.5 shrink-0" />
-        <div className="flex-1 min-w-0">
-          <span className="text-[11px] text-forge-green font-semibold">{event.tool} result</span>
-          <p className="text-[10px] text-forge-muted mt-0.5 font-mono truncate">{preview}</p>
-        </div>
-        {expanded ? <ChevronDown size={10} className="text-forge-muted mt-1" /> : <ChevronRight size={10} className="text-forge-muted mt-1" />}
-      </button>
-      {expanded && (
-        <div className="mt-1 bg-forge-bg border border-forge-border rounded-lg p-3 overflow-auto max-h-60">
-          <pre className="text-[10px] text-forge-muted font-mono whitespace-pre-wrap">{output}</pre>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function PermissionEvent({ event, onDecide }) {
-  const pending = useForgeStore((s) => s.pendingPermissions.some((p) => p.permissionId === event.permissionId));
-  const [expanded, setExpanded] = useState(true);
-  const Icon = TOOL_ICONS[event.tool] || Shield;
-  const color = TOOL_COLORS[event.tool] || "text-forge-yellow";
-
-  if (!pending) return null;
-
-  const preview = typeof event.input === "object"
-    ? Object.values(event.input || {})[0] : event.input;
-  const previewStr = typeof preview === "string" ? preview.slice(0, 200) : JSON.stringify(event.input)?.slice(0, 200);
-
-  return (
-    <div className="fade-in border-2 border-forge-yellow/50 rounded-xl p-3 bg-forge-yellow/5">
-      <div className="flex items-center gap-2 mb-2">
-        <Shield size={14} className="text-forge-yellow animate-pulse" />
-        <span className="text-xs font-bold text-forge-yellow">Permission Required</span>
-      </div>
-      <button onClick={() => setExpanded(!expanded)} className="w-full flex items-start gap-2 text-left mb-3">
-        <Icon size={13} className={clsx("mt-0.5 shrink-0", color)} />
-        <div className="flex-1 min-w-0">
-          <span className={clsx("text-xs font-semibold", color)}>{event.tool}</span>
-          <p className="text-[11px] text-forge-muted mt-0.5 font-mono">{previewStr}</p>
-        </div>
-      </button>
-      {expanded && event.input && (
-        <div className="bg-forge-bg border border-forge-border rounded-lg p-3 mb-3 overflow-x-auto">
-          <pre className="text-[10px] text-forge-muted font-mono whitespace-pre-wrap">{JSON.stringify(event.input, null, 2)}</pre>
-        </div>
-      )}
-      <div className="flex items-center gap-2">
-        <button onClick={() => onDecide(event.permissionId, "allow")}
-          className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-forge-green/20 border border-forge-green text-xs font-semibold text-forge-green hover:bg-forge-green/30 transition-colors">
-          <ShieldCheck size={12} /> Allow
-        </button>
-        <button onClick={() => onDecide(event.permissionId, "deny")}
-          className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-forge-red/20 border border-forge-red text-xs font-semibold text-forge-red hover:bg-forge-red/30 transition-colors">
-          <ShieldX size={12} /> Deny
-        </button>
-        <span className="text-[10px] text-forge-muted ml-auto flex items-center gap-1">
-          <Clock size={10} /> Waiting...
-        </span>
+        )}
       </div>
     </div>
   );
 }
 
-function PermissionDecidedEvent({ event }) {
-  const allowed = event.decision === "allow";
+
+// ── Activity side panel (replaces Events tab) ──
+function ActivityPanel({ permissions, sessionEvents, onPermission, onClose }) {
+  const allEvents = Object.values(sessionEvents).flat().sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 100);
+
   return (
-    <div className={clsx("fade-in flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs",
-      allowed ? "bg-forge-green/10 border border-forge-green/30" : "bg-forge-red/10 border border-forge-red/30"
-    )}>
-      {allowed ? <ShieldCheck size={12} className="text-forge-green" /> : <ShieldX size={12} className="text-forge-red" />}
-      <span className={allowed ? "text-forge-green" : "text-forge-red"}>
-        {event.tool} — {allowed ? "Allowed" : "Denied"}
-      </span>
+    <div className="w-80 border-l border-forge-border flex flex-col bg-forge-surface/30 shrink-0">
+      <div className="px-3 py-2 border-b border-forge-border flex items-center gap-2">
+        <Zap size={12} className="text-forge-accent" />
+        <span className="text-xs font-semibold text-forge-text">Activity</span>
+        <button onClick={onClose} className="ml-auto p-1 rounded text-forge-muted hover:text-forge-text">
+          <X size={11} />
+        </button>
+      </div>
+
+      {/* Pending permissions */}
+      {permissions.length > 0 && (
+        <div className="p-2 border-b border-forge-border flex flex-col gap-2">
+          {permissions.map(p => (
+            <div key={p.permissionId} className="bg-forge-yellow/5 border border-forge-yellow/30 rounded-lg p-2.5">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <Shield size={11} className="text-forge-yellow" />
+                <span className="text-[11px] font-semibold text-forge-yellow">Permission</span>
+              </div>
+              <p className="text-[10px] text-forge-text font-semibold mb-1">{p.tool}</p>
+              {p.input && (
+                <p className="text-[9px] text-forge-muted font-mono mb-2 line-clamp-2">
+                  {typeof p.input === "string" ? p.input.slice(0, 100) : JSON.stringify(p.input).slice(0, 100)}
+                </p>
+              )}
+              <div className="flex gap-1.5">
+                <button
+                  onClick={() => onPermission(p.permissionId, "allow")}
+                  className="flex-1 flex items-center justify-center gap-1 py-1 rounded-md bg-forge-green/20 border border-forge-green/40 text-[10px] font-semibold text-forge-green hover:bg-forge-green/30 transition-colors"
+                >
+                  <ShieldCheck size={10} /> Allow
+                </button>
+                <button
+                  onClick={() => onPermission(p.permissionId, "deny")}
+                  className="flex-1 flex items-center justify-center gap-1 py-1 rounded-md bg-forge-red/20 border border-forge-red/40 text-[10px] font-semibold text-forge-red hover:bg-forge-red/30 transition-colors"
+                >
+                  <ShieldX size={10} /> Deny
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Event stream */}
+      <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-1">
+        {allEvents.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full gap-2 text-forge-muted">
+            <Zap size={16} />
+            <p className="text-[10px]">No activity yet</p>
+          </div>
+        ) : (
+          allEvents.map((event, i) => <MiniEvent key={i} event={event} />)
+        )}
+      </div>
     </div>
   );
 }
 
-function WaitingEvent({ event }) {
-  return (
-    <div className="fade-in flex items-center gap-2 px-3 py-2 rounded-lg bg-forge-accent/10 border border-forge-accent/30">
-      <AlertCircle size={12} className="text-forge-accent animate-pulse" />
-      <span className="text-xs text-forge-accent">Agent is waiting for your input</span>
-    </div>
-  );
-}
 
-function StatusEvent({ event }) {
-  return (
-    <div className="fade-in flex items-center gap-2 px-3 py-1 text-[10px] text-forge-muted">
-      <span className={clsx("w-1.5 h-1.5 rounded-full",
-        event.status === "active" ? "bg-forge-green" : event.status === "error" ? "bg-forge-red" : "bg-forge-muted"
-      )} />
-      Session {event.status}
-    </div>
-  );
-}
-
-function SubAgentEvent({ event }) {
-  return (
-    <div className="fade-in flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/30">
-      <Users size={12} className="text-purple-400" />
-      <span className="text-xs text-purple-400 font-semibold">Sub-agent spawned</span>
-      <span className="text-[10px] text-forge-muted">{event.agent?.description}</span>
-    </div>
-  );
+// ── Compact event display for activity panel ──
+function MiniEvent({ event }) {
+  switch (event.type) {
+    case "message": {
+      const isUser = event.role === "user";
+      return (
+        <div className="flex items-start gap-1.5 px-2 py-1.5 rounded-md hover:bg-forge-surface/50">
+          {isUser
+            ? <User size={10} className="text-forge-muted mt-0.5 shrink-0" />
+            : <Bot size={10} className="text-forge-accent mt-0.5 shrink-0" />}
+          <p className="text-[10px] text-forge-text line-clamp-2">{event.text?.slice(0, 100)}</p>
+        </div>
+      );
+    }
+    case "tool_call": {
+      const Icon = TOOL_ICONS[event.tool] || Zap;
+      const color = TOOL_COLORS[event.tool] || "text-forge-muted";
+      return (
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-forge-surface/50">
+          <Icon size={10} className={clsx("shrink-0", color)} />
+          <span className={clsx("text-[10px] font-medium", color)}>{event.tool}</span>
+          <span className="text-[9px] text-forge-muted font-mono truncate">
+            {typeof event.input === "object" ? Object.values(event.input || {})[0]?.toString().slice(0, 40) : ""}
+          </span>
+        </div>
+      );
+    }
+    case "tool_result": {
+      return (
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-forge-surface/50 ml-2">
+          <CheckCircle2 size={9} className="text-forge-green shrink-0" />
+          <span className="text-[9px] text-forge-muted truncate">{event.tool} done</span>
+        </div>
+      );
+    }
+    case "waiting":
+      return (
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-forge-accent/5">
+          <AlertCircle size={10} className="text-forge-accent shrink-0" />
+          <span className="text-[10px] text-forge-accent">Waiting for input</span>
+        </div>
+      );
+    case "subagent":
+      return (
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded-md">
+          <Users size={10} className="text-purple-400 shrink-0" />
+          <span className="text-[10px] text-purple-400">Sub-agent</span>
+        </div>
+      );
+    default:
+      return null;
+  }
 }
