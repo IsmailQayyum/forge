@@ -11,6 +11,11 @@ import { integrationsRouter } from "./routes/integrations.js";
 import { agentsRouter } from "./routes/agents.js";
 import { sessionsRouter } from "./routes/sessions.js";
 import { hooksRouter, setHooksBroadcast } from "./routes/hooks.js";
+import {
+  spawnTerminal, writeToTerminal, resizeTerminal,
+  attachClient, detachClient, detachClientFromAll,
+  killTerminal, getTerminals,
+} from "./terminal.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.FORGE_PORT || 3333;
@@ -29,6 +34,26 @@ app.use("/api/agents", agentsRouter);
 app.use("/api/sessions", sessionsRouter);
 app.use("/api/hooks", hooksRouter);
 app.get("/api/health", (_, res) => res.json({ ok: true, version: "1.0.0" }));
+
+// Terminal API
+app.post("/api/terminal/spawn", (req, res) => {
+  const { cwd, args, shell } = req.body;
+  try {
+    const result = spawnTerminal({ cwd, args, shell });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/terminal/list", (_, res) => {
+  res.json({ terminals: getTerminals() });
+});
+
+app.post("/api/terminal/:id/kill", (req, res) => {
+  killTerminal(req.params.id);
+  res.json({ ok: true });
+});
 
 // Serve built frontend in production (catch-all last)
 if (process.argv.includes("--serve")) {
@@ -55,6 +80,7 @@ wss.on("connection", (ws) => {
     payload: {
       sessions: sessionWatcher.getSessions(),
       agents: agentStore.getAll(),
+      terminals: getTerminals(),
     },
     ts: Date.now(),
   }));
@@ -67,6 +93,10 @@ wss.on("connection", (ws) => {
       // ignore malformed messages
     }
   });
+
+  ws.on("close", () => {
+    detachClientFromAll(ws);
+  });
 });
 
 function handleClientMessage(msg, ws) {
@@ -74,8 +104,26 @@ function handleClientMessage(msg, ws) {
     case "SESSION_INPUT":
       sessionWatcher.sendInput(msg.payload.sessionId, msg.payload.text);
       break;
+
     case "PING":
       ws.send(JSON.stringify({ type: "PONG", ts: Date.now() }));
+      break;
+
+    // ── Terminal I/O ──
+    case "TERMINAL_INPUT":
+      writeToTerminal(msg.payload.terminalId, msg.payload.data);
+      break;
+
+    case "TERMINAL_RESIZE":
+      resizeTerminal(msg.payload.terminalId, msg.payload.cols, msg.payload.rows);
+      break;
+
+    case "TERMINAL_ATTACH":
+      attachClient(msg.payload.terminalId, ws);
+      break;
+
+    case "TERMINAL_DETACH":
+      detachClient(msg.payload.terminalId, ws);
       break;
   }
 }

@@ -11,9 +11,11 @@ export function useWebSocket() {
   function connect() {
     const ws = new WebSocket(WS_URL);
     wsRef.current = ws;
+    window.__forgeWs = ws; // expose for terminal component
 
     ws.onopen = () => {
       console.log("Forge connected");
+      window.__forgeWs = ws;
       if (reconnectRef.current) {
         clearTimeout(reconnectRef.current);
         reconnectRef.current = null;
