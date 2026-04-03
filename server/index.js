@@ -16,6 +16,8 @@ import { costsRouter } from "./routes/costs.js";
 import { gitRouter } from "./routes/git.js";
 import { claudemdRouter } from "./routes/claudemd.js";
 import { getQuickActions } from "./stores/quick-actions.js";
+import { notificationsRouter } from "./routes/notifications.js";
+import { notificationStore } from "./stores/notifications.js";
 import {
   spawnTerminal, writeToTerminal, resizeTerminal,
   attachClient, detachClient, detachClientFromAll,
@@ -42,6 +44,7 @@ app.use("/api/prompts", promptsRouter);
 app.use("/api/costs", costsRouter);
 app.use("/api/git", gitRouter);
 app.use("/api/claudemd", claudemdRouter);
+app.use("/api/notifications", notificationsRouter);
 app.get("/api/quick-actions", (_, res) => res.json(getQuickActions()));
 app.get("/api/health", (_, res) => res.json({ ok: true, version: "1.0.0" }));
 

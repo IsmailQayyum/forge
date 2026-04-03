@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useForgeStore } from "../../store/index.js";
 import { XTerminal } from "./XTerminal.jsx";
+import { MultiSession } from "./MultiSession.jsx";
 import {
   MessageSquare, Send, Bot, User, Shield, ShieldCheck, ShieldX,
   Terminal, FileText, Edit, Search, Users, Zap, ChevronDown, ChevronRight,
   AlertCircle, Clock, CheckCircle2, XCircle, Plus, Play, Square,
-  FolderOpen, TerminalSquare, List,
+  FolderOpen, TerminalSquare, List, Grid2X2,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -283,6 +284,16 @@ export function Messenger() {
               Terminal
             </button>
             <button
+              onClick={() => setTab("multi")}
+              className={clsx(
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors",
+                tab === "multi" ? "bg-forge-accent text-white" : "text-forge-muted hover:text-forge-text"
+              )}
+            >
+              <Grid2X2 size={11} />
+              Multi
+            </button>
+            <button
               onClick={() => setTab("events")}
               className={clsx(
                 "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors",
@@ -366,6 +377,8 @@ export function Messenger() {
               </div>
             )}
           </div>
+        ) : tab === "multi" ? (
+          <MultiSession wsRef={wsRef} />
         ) : (
           /* Events tab — raw feed */
           <div className="flex-1 flex flex-col overflow-hidden">
