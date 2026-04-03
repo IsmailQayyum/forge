@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from "react";
 import { FileText, Terminal, Search, Edit, Users, Zap } from "lucide-react";
 import clsx from "clsx";
+import { TokenBurnRate } from "./TokenBurnRate.jsx";
 
 const TOOL_ICONS = {
   Read: FileText,
@@ -78,6 +79,9 @@ export function ActivityFeed({ session }) {
           )}
         </div>
       </div>
+
+      {/* Token burn rate */}
+      <TokenBurnRate session={session} />
 
       {/* Sub-agents */}
       {session.subAgents?.length > 0 && (

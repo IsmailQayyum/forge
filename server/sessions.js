@@ -18,16 +18,39 @@ function getProjectName(filePath) {
   const parts = filePath.split(path.sep);
   const projectIdx = parts.indexOf("projects");
   if (projectIdx === -1) return "unknown";
-  const projectHash = parts[projectIdx + 1];
-  // Try to resolve the project hash to a real path
-  const metaPath = path.join(CLAUDE_PROJECTS_DIR, projectHash, "metadata.json");
-  if (fs.existsSync(metaPath)) {
-    try {
-      const meta = JSON.parse(fs.readFileSync(metaPath, "utf8"));
-      return meta.name || meta.path?.split("/").pop() || projectHash.slice(0, 8);
-    } catch {}
-  }
-  return projectHash.slice(0, 8);
+  const encodedName = parts[projectIdx + 1];
+  // Decode: folder name is the path with '/' replaced by '-'
+  // e.g. -Users-ismailqayyum-Documents-work-build → build
+  const decoded = encodedName.replace(/^-/, "/").replace(/-/g, "/");
+  return path.basename(decoded) || encodedName.split("-").pop() || "unknown";
+}
+
+function isRootSessionFile(filePath) {
+  // Only watch JSONL files directly inside a project folder
+  // Structure: ~/.claude/projects/<project>/<session-id>.jsonl
+  // NOT: ~/.claude/projects/<project>/<session-id>/subagents/agent-xxx.jsonl
+  const parts = filePath.split(path.sep);
+  const projectIdx = parts.indexOf("projects");
+  if (projectIdx === -1) return false;
+  // Root session files are exactly 2 levels deep after 'projects'
+  // projects/<project>/<session>.jsonl → depth = 2
+  return parts.length === projectIdx + 3;
+}
+
+function loadSubAgents(sessionId, projectFolder) {
+  const subagentsDir = path.join(projectFolder, sessionId, "subagents");
+  if (!fs.existsSync(subagentsDir)) return [];
+  return fs.readdirSync(subagentsDir)
+    .filter((f) => f.endsWith(".jsonl"))
+    .map((f) => {
+      const agentId = f.replace(".jsonl", "");
+      return {
+        id: agentId,
+        description: agentId.replace("agent-", "").slice(0, 20),
+        status: "done",
+        ts: fs.statSync(path.join(subagentsDir, f)).mtimeMs,
+      };
+    });
 }
 
 function parseEntry(line) {
@@ -147,9 +170,27 @@ function processEntry(sessionId, projectName, entry, broadcast) {
   broadcast("SESSION_UPDATE", { sessionId, session });
 }
 
+// How recently a file must have been modified to be considered "active"
+const ACTIVE_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
+
+function getSessionStatus(filePath) {
+  try {
+    const stat = fs.statSync(filePath);
+    const age = Date.now() - stat.mtimeMs;
+    if (age < ACTIVE_THRESHOLD_MS) return "active";
+    return "done";
+  } catch {
+    return "done";
+  }
+}
+
 function watchFile(filePath, broadcast) {
+  if (!isRootSessionFile(filePath)) return; // skip sub-agent files
+
   const sessionId = getSessionId(filePath);
   const projectName = getProjectName(filePath);
+  const projectFolder = path.dirname(filePath);
+  const initialStatus = getSessionStatus(filePath);
 
   // Read existing content
   let offset = 0;
@@ -161,6 +202,29 @@ function watchFile(filePath, broadcast) {
       processEntry(sessionId, projectName, entry, () => {}); // silent init
     }
     offset = content.length;
+
+    // Set accurate initial status based on file mtime
+    const session = sessions.get(sessionId);
+    if (session) {
+      session.status = initialStatus;
+
+      // Check if last entry was a "result" type (session completed)
+      const lastLine = lines.at(-1);
+      if (lastLine) {
+        const lastEntry = parseEntry(lastLine);
+        if (lastEntry?.type === "result") {
+          session.status = "done";
+        }
+      }
+
+      // Load sub-agents from subagents/ directory
+      const subAgents = loadSubAgents(sessionId, projectFolder);
+      if (subAgents.length > 0) {
+        session.subAgents = subAgents;
+      }
+
+      sessions.set(sessionId, session);
+    }
     broadcast("SESSION_DISCOVERED", { sessionId, session: sessions.get(sessionId) });
   } catch {}
 
@@ -194,7 +258,8 @@ export const sessionWatcher = {
     chokidar
       .watch(path.join(CLAUDE_PROJECTS_DIR, "**/*.jsonl"), {
         ignoreInitial: false,
-        depth: 4,
+        depth: 2, // only: projects/<project>/<session>.jsonl
+        ignored: /subagents|tool-results/, // never recurse into sub-agent dirs
       })
       .on("add", (filePath) => watchFile(filePath, broadcast))
       .on("error", (err) => console.error("Session watcher error:", err));

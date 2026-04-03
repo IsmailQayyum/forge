@@ -53,6 +53,20 @@ function handleMessage(msg, store) {
       const { sessions = [], agents } = msg.payload;
       for (const s of sessions) {
         store.addSession(s);
+        // Build initial event stream from existing messages + tool calls
+        if (s.messages?.length || s.toolCalls?.length) {
+          const events = [];
+          for (const m of s.messages || []) {
+            events.push({ type: "message", role: m.role, text: m.text, ts: m.ts });
+          }
+          for (const tc of s.toolCalls || []) {
+            events.push({ type: "tool_call", tool: tc.name, input: tc.input, status: tc.status, ts: tc.ts });
+          }
+          events.sort((a, b) => a.ts - b.ts);
+          for (const e of events) {
+            store.addSessionEvent(s.id, e);
+          }
+        }
       }
       if (agents?.architectures) {
         store.setArchitectures(agents.architectures);
@@ -68,15 +82,101 @@ function handleMessage(msg, store) {
       break;
     }
 
+    case "SESSION_MESSAGE": {
+      const { sessionId, message } = msg.payload;
+      if (message) {
+        store.addSessionEvent(sessionId, {
+          type: "message",
+          role: message.role,
+          text: message.text,
+          ts: message.ts,
+        });
+      }
+      break;
+    }
+
     case "TOOL_CALL": {
       const { sessionId, toolCall } = msg.payload;
       store.addToolCall(sessionId, toolCall);
+      store.addSessionEvent(sessionId, {
+        type: "tool_call",
+        id: toolCall.id,
+        tool: toolCall.name,
+        input: toolCall.input,
+        status: "running",
+        ts: toolCall.ts,
+      });
+      break;
+    }
+
+    case "TOOL_CALL_DONE": {
+      const { sessionId, toolCallId } = msg.payload;
+      store.addSessionEvent(sessionId, {
+        type: "tool_done",
+        id: toolCallId,
+        ts: Date.now(),
+      });
+      break;
+    }
+
+    case "HOOK_TOOL_COMPLETE": {
+      const { sessionId, tool, input, output, ts } = msg.payload;
+      store.addSessionEvent(sessionId, {
+        type: "tool_result",
+        tool,
+        input,
+        output,
+        ts: ts ? new Date(ts).getTime() : Date.now(),
+      });
+      break;
+    }
+
+    // ── Permission flow ──
+    case "PERMISSION_REQUEST": {
+      const { permissionId, sessionId, project, tool, input, ts } = msg.payload;
+      store.addPendingPermission({ permissionId, sessionId, project, tool, input, ts });
+      store.addSessionEvent(sessionId, {
+        type: "permission_request",
+        permissionId,
+        tool,
+        input,
+        ts,
+      });
+
+      // OS notification
+      const title = `Forge — ${project}`;
+      const body = `${tool} needs permission`;
+      if (Notification.permission === "granted") {
+        new Notification(title, { body, icon: "/forge-icon.png" });
+      } else if (Notification.permission !== "denied") {
+        Notification.requestPermission().then((perm) => {
+          if (perm === "granted") new Notification(title, { body });
+        });
+      }
+      break;
+    }
+
+    case "PERMISSION_DECIDED": {
+      const { permissionId, sessionId, decision, tool } = msg.payload;
+      store.resolvePermission(permissionId);
+      store.addSessionEvent(sessionId, {
+        type: "permission_decided",
+        permissionId,
+        tool,
+        decision,
+        ts: Date.now(),
+      });
       break;
     }
 
     case "SESSION_WAITING": {
       const { sessionId, message, project } = msg.payload;
       store.addPendingInput({ sessionId, message, project, ts: msg.ts });
+      store.addSessionEvent(sessionId, {
+        type: "waiting",
+        message,
+        ts: Date.now(),
+      });
       store.addNotification({
         id: `notif-${Date.now()}`,
         type: "input_needed",
@@ -86,7 +186,6 @@ function handleMessage(msg, store) {
         ts: msg.ts,
       });
 
-      // Browser notification
       if (Notification.permission === "granted") {
         new Notification(`Forge — ${project}`, {
           body: message?.slice(0, 100),
@@ -107,6 +206,11 @@ function handleMessage(msg, store) {
     case "SESSION_STATUS": {
       const { sessionId, status } = msg.payload;
       store.updateSession(sessionId, { status });
+      store.addSessionEvent(sessionId, {
+        type: "status",
+        status,
+        ts: Date.now(),
+      });
       break;
     }
 
@@ -124,6 +228,11 @@ function handleMessage(msg, store) {
           subAgents: [...(session.subAgents || []), subAgent],
         });
       }
+      store.addSessionEvent(sessionId, {
+        type: "subagent",
+        agent: subAgent,
+        ts: Date.now(),
+      });
       break;
     }
   }

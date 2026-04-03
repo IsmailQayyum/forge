@@ -48,10 +48,10 @@ export function ContextHub() {
   function injectAll() {
     if (!targetSession || contextItems.length === 0) return;
     const combined = contextItems.map((c) => `## ${c.name}\n\n${c.content}`).join("\n\n---\n\n");
-    fetch("/api/session/input", {
+    fetch(`/api/sessions/${targetSession}/input`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sessionId: targetSession, text: combined }),
+      body: JSON.stringify({ text: combined }),
     });
   }
 

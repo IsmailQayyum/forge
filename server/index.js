@@ -9,6 +9,8 @@ import { agentStore } from "./agents/store.js";
 import { contextRouter } from "./routes/context.js";
 import { integrationsRouter } from "./routes/integrations.js";
 import { agentsRouter } from "./routes/agents.js";
+import { sessionsRouter } from "./routes/sessions.js";
+import { hooksRouter, setHooksBroadcast } from "./routes/hooks.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.FORGE_PORT || 3333;
@@ -20,20 +22,20 @@ const wss = new WebSocketServer({ server, path: "/ws" });
 app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 
-// Serve built frontend in production
+// API routes (must come before static catch-all)
+app.use("/api/context", contextRouter);
+app.use("/api/integrations", integrationsRouter);
+app.use("/api/agents", agentsRouter);
+app.use("/api/sessions", sessionsRouter);
+app.use("/api/hooks", hooksRouter);
+app.get("/api/health", (_, res) => res.json({ ok: true, version: "1.0.0" }));
+
+// Serve built frontend in production (catch-all last)
 if (process.argv.includes("--serve")) {
   const distPath = path.resolve(__dirname, "../dist");
   app.use(express.static(distPath));
   app.get("*", (_, res) => res.sendFile(path.join(distPath, "index.html")));
 }
-
-// API routes
-app.use("/api/context", contextRouter);
-app.use("/api/integrations", integrationsRouter);
-app.use("/api/agents", agentsRouter);
-
-// Health check
-app.get("/api/health", (_, res) => res.json({ ok: true, version: "1.0.0" }));
 
 // WebSocket broadcast
 export function broadcast(type, payload) {
@@ -70,7 +72,6 @@ wss.on("connection", (ws) => {
 function handleClientMessage(msg, ws) {
   switch (msg.type) {
     case "SESSION_INPUT":
-      // Developer replied to an agent — write to session input file
       sessionWatcher.sendInput(msg.payload.sessionId, msg.payload.text);
       break;
     case "PING":
@@ -79,7 +80,8 @@ function handleClientMessage(msg, ws) {
   }
 }
 
-// Start session watcher
+// Wire broadcast to hooks and start session watcher
+setHooksBroadcast(broadcast);
 sessionWatcher.start(broadcast);
 
 server.listen(PORT, () => {

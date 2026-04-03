@@ -6,6 +6,7 @@ import { createRequire } from "module";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { spawn } from "child_process";
+import { installCommand, uninstallCommand } from "../src/cli/install.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -57,5 +58,17 @@ program
       process.exit(0);
     });
   });
+
+program
+  .command("install")
+  .description("Install Forge bridge hooks into Claude Code")
+  .option("-g, --global", "Install into ~/.claude/settings.json (all projects)")
+  .action(installCommand);
+
+program
+  .command("uninstall")
+  .description("Remove Forge bridge hooks from Claude Code")
+  .option("-g, --global", "Remove from ~/.claude/settings.json")
+  .action(uninstallCommand);
 
 program.parse();

@@ -36,6 +36,25 @@ export const useForgeStore = create((set, get) => ({
       pendingInputs: s.pendingInputs.filter((p) => p.sessionId !== sessionId),
     })),
 
+  // Permissions — tool approval/deny from Forge UI
+  pendingPermissions: [],
+  addPendingPermission: (perm) =>
+    set((s) => ({ pendingPermissions: [...s.pendingPermissions, perm] })),
+  resolvePermission: (permissionId) =>
+    set((s) => ({
+      pendingPermissions: s.pendingPermissions.filter((p) => p.permissionId !== permissionId),
+    })),
+
+  // Session event stream — raw feed of everything that happens
+  sessionEvents: {}, // sessionId -> [event, event, ...]
+  addSessionEvent: (sessionId, event) =>
+    set((s) => ({
+      sessionEvents: {
+        ...s.sessionEvents,
+        [sessionId]: [...(s.sessionEvents[sessionId] || []), event],
+      },
+    })),
+
   // Notifications
   notifications: [],
   addNotification: (notif) =>
@@ -79,6 +98,21 @@ export const useForgeStore = create((set, get) => ({
         [name]: { ...s.integrations[name], ...data },
       },
     })),
+
+  // Session renaming
+  renameSession: async (sessionId, name) => {
+    await fetch(`/api/sessions/${sessionId}/rename`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    set((s) => ({
+      sessions: {
+        ...s.sessions,
+        [sessionId]: { ...s.sessions[sessionId], displayName: name },
+      },
+    }));
+  },
 
   // Active session selection
   selectedSessionId: null,

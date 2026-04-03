@@ -11,7 +11,7 @@ import "reactflow/dist/style.css";
 import { useForgeStore } from "../../store/index.js";
 import { AgentNode } from "./AgentNode.jsx";
 import { CapabilitiesPanel } from "./CapabilitiesPanel.jsx";
-import { GitBranch, Plus, Save, Trash2 } from "lucide-react";
+import { GitBranch, Plus, Save, Trash2, FileDown } from "lucide-react";
 
 const NODE_TYPES = { agentNode: AgentNode };
 
@@ -33,6 +33,8 @@ export function AgentArchitect() {
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedNode, setSelectedNode] = useState(null);
   const [archName, setArchName] = useState("My Architecture");
+  const [savedArchId, setSavedArchId] = useState(null);
+  const [exportStatus, setExportStatus] = useState(null);
   const saveArchitecture = useForgeStore((s) => s.saveArchitecture);
 
   const onConnect = useCallback(
@@ -67,19 +69,50 @@ export function AgentArchitect() {
   }
 
   function save() {
+    const id = savedArchId || `arch-${Date.now()}`;
     const arch = {
-      id: `arch-${Date.now()}`,
+      id,
       name: archName,
       nodes,
       edges,
       updatedAt: Date.now(),
     };
     saveArchitecture(arch);
+    setSavedArchId(id);
     fetch("/api/agents", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(arch),
     });
+  }
+
+  async function exportClaudeMd() {
+    // Save first to ensure the architecture is persisted
+    const id = savedArchId || `arch-${Date.now()}`;
+    const arch = { id, name: archName, nodes, edges, updatedAt: Date.now() };
+    setSavedArchId(id);
+    saveArchitecture(arch);
+    await fetch("/api/agents", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(arch),
+    });
+
+    // Fetch the generated CLAUDE.md
+    const res = await fetch(`/api/agents/${id}/claudemd`);
+    const { markdown } = await res.json();
+
+    // Download as file
+    const blob = new Blob([markdown], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "CLAUDE.md";
+    a.click();
+    URL.revokeObjectURL(url);
+
+    setExportStatus("Downloaded!");
+    setTimeout(() => setExportStatus(null), 2000);
   }
 
   return (
@@ -117,6 +150,13 @@ export function AgentArchitect() {
             >
               <Save size={12} />
               Save
+            </button>
+            <button
+              onClick={exportClaudeMd}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-forge-surface border border-forge-green text-xs text-forge-green hover:bg-forge-green/10 transition-colors"
+            >
+              <FileDown size={12} />
+              {exportStatus || "Export CLAUDE.md"}
             </button>
           </div>
         </div>
