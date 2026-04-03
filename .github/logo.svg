@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <rect width="120" height="120" rx="24" fill="#0e0e10"/>
+  <rect x="4" y="4" width="112" height="112" rx="20" fill="#18181b" stroke="#27272a" stroke-width="1"/>
+  <!-- Anvil base -->
+  <path d="M30 82 L90 82 L95 90 L25 90 Z" fill="#f97316"/>
+  <!-- Anvil body -->
+  <path d="M35 62 L85 62 L90 82 L30 82 Z" fill="#f97316" opacity="0.85"/>
+  <!-- Anvil horn -->
+  <path d="M85 62 L105 55 L105 62 L85 66 Z" fill="#f97316" opacity="0.7"/>
+  <!-- Hammer -->
+  <rect x="52" y="24" width="6" height="32" rx="2" fill="#e4e4e7" transform="rotate(-15 55 40)"/>
+  <rect x="42" y="22" width="26" height="10" rx="3" fill="#f97316" transform="rotate(-15 55 27)"/>
+  <!-- Sparks -->
+  <circle cx="38" cy="56" r="2" fill="#facc15" opacity="0.9"/>
+  <circle cx="44" cy="50" r="1.5" fill="#facc15" opacity="0.7"/>
+  <circle cx="32" cy="52" r="1" fill="#fde68a" opacity="0.8"/>
+  <circle cx="48" cy="44" r="1.5" fill="#fde68a" opacity="0.6"/>
+  <!-- Terminal prompt hint -->
+  <text x="60" y="106" text-anchor="middle" fill="#3f3f46" font-family="monospace" font-size="9" font-weight="600">&gt;_ FORGE</text>
+</svg>
