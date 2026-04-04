@@ -47,7 +47,7 @@ export function Messenger() {
     return () => clearInterval(interval);
   }, []);
 
-  // ── Listen for terminal exits ──
+  // ── Listen for terminal events (spawns from other UIs, exits) ──
   useEffect(() => {
     function handleWs(event) {
       try {
@@ -56,6 +56,24 @@ export function Messenger() {
           setTerminals(prev => prev.map(t =>
             t.terminalId === msg.terminalId ? { ...t, status: "exited" } : t
           ));
+        }
+        // Pick up terminals spawned externally (e.g. Agent Architect "Run")
+        if (msg.type === "TERMINAL_SPAWNED") {
+          const p = msg.payload;
+          setTerminals(prev => {
+            // Don't add if we already have it (we spawned it ourselves)
+            if (prev.some(t => t.terminalId === p.terminalId)) return prev;
+            return [...prev, {
+              id: p.terminalId,
+              terminalId: p.terminalId,
+              label: p.label || `Session ${prev.length + 1}`,
+              cwd: p.cwd || "~",
+              status: "active",
+              pid: p.pid,
+              createdAt: Date.now(),
+            }];
+          });
+          setActiveTermId(prev => prev || p.terminalId); // focus first one if none active
         }
       } catch {}
     }

@@ -56,11 +56,25 @@ export function spawnTerminal({ cwd, args = [], terminalId, shell }) {
     cwd: cwd || os.homedir(),
     createdAt: Date.now(),
     pid: ptyProcess.pid,
+    outputBuffer: [],      // stores last N lines for agent output capture
+    maxBuffer: 500,
+    onExitCallbacks: [],   // callbacks when terminal exits
   };
 
   terminals.set(id, termEntry);
 
   ptyProcess.onData((data) => {
+    // Buffer output for agent capture
+    termEntry.outputBuffer.push(data);
+    if (termEntry.outputBuffer.length > termEntry.maxBuffer) {
+      termEntry.outputBuffer.shift();
+    }
+    // Fire data callbacks (used by run engine for activity tracking)
+    if (termEntry.onDataCallbacks) {
+      for (const cb of termEntry.onDataCallbacks) {
+        try { cb(id, data); } catch {}
+      }
+    }
     for (const ws of termEntry.clients) {
       if (ws.readyState === 1) {
         ws.send(JSON.stringify({ type: "TERMINAL_OUTPUT", terminalId: id, data }));
@@ -69,6 +83,10 @@ export function spawnTerminal({ cwd, args = [], terminalId, shell }) {
   });
 
   ptyProcess.onExit(({ exitCode }) => {
+    // Fire exit callbacks (used by run engine)
+    for (const cb of termEntry.onExitCallbacks) {
+      try { cb(id, exitCode, termEntry.outputBuffer.join("")); } catch {}
+    }
     for (const ws of termEntry.clients) {
       if (ws.readyState === 1) {
         ws.send(JSON.stringify({ type: "TERMINAL_EXIT", terminalId: id, exitCode }));
@@ -129,4 +147,25 @@ export function detachClientFromAll(ws) {
   for (const entry of terminals.values()) {
     entry.clients.delete(ws);
   }
+}
+
+export function getTerminalBuffer(terminalId) {
+  const entry = terminals.get(terminalId);
+  if (!entry) return "";
+  return entry.outputBuffer.join("");
+}
+
+export function onTerminalExit(terminalId, callback) {
+  const entry = terminals.get(terminalId);
+  if (!entry) return false;
+  entry.onExitCallbacks.push(callback);
+  return true;
+}
+
+export function onTerminalData(terminalId, callback) {
+  const entry = terminals.get(terminalId);
+  if (!entry) return false;
+  if (!entry.onDataCallbacks) entry.onDataCallbacks = [];
+  entry.onDataCallbacks.push(callback);
+  return true;
 }

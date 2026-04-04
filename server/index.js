@@ -102,9 +102,22 @@ app.get("/api/fs/projects", (req, res) => {
 
 // Terminal API
 app.post("/api/terminal/spawn", (req, res) => {
-  const { cwd, args, shell } = req.body;
+  const { cwd, args, shell, initialPrompt, label } = req.body;
   try {
     const result = spawnTerminal({ cwd, args, shell });
+    // Broadcast so all connected UIs (Messenger) pick up the new terminal
+    broadcast("TERMINAL_SPAWNED", {
+      terminalId: result.terminalId,
+      pid: result.pid,
+      cwd: cwd || os.homedir(),
+      label: label || cwd?.split("/").pop() || "Session",
+    });
+    // If an initial prompt is provided, send it after Claude boots up
+    if (initialPrompt && result.terminalId) {
+      setTimeout(() => {
+        writeToTerminal(result.terminalId, initialPrompt + "\n");
+      }, 2500);
+    }
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -193,8 +206,10 @@ function handleClientMessage(msg, ws) {
   }
 }
 
-// Wire broadcast to hooks and start session watcher
+// Wire broadcast to hooks, runner, and start session watcher
+import { runManager } from "./agents/runner.js";
 setHooksBroadcast(broadcast);
+runManager.setBroadcast(broadcast);
 sessionWatcher.start(broadcast);
 
 server.listen(PORT, () => {

@@ -47,4 +47,9 @@ export const agentStore = {
     data.active = id;
     save(data);
   },
+
+  getById(id) {
+    const data = load();
+    return data.architectures.find((a) => a.id === id) || null;
+  },
 };

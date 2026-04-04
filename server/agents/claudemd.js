@@ -5,7 +5,7 @@
  * hierarchy and respect per-agent capability boundaries.
  */
 
-const CAPABILITY_DESCRIPTIONS = {
+export const CAPABILITY_DESCRIPTIONS = {
   read_files: "Read files from the filesystem",
   write_files: "Write and edit files on the filesystem",
   run_commands: "Execute terminal/shell commands",
@@ -72,7 +72,7 @@ export function generateClaudeMd(architecture) {
     const node = nodes.find((n) => n.id === nodeId);
     if (!node) return;
     const prefix = depth === 0 ? "" : "  ".repeat(depth) + "- ";
-    const roleTag = node.data.role === "supervisor" ? " (supervisor)" : "";
+    const roleTag = node.data.role && node.data.role !== "worker" ? ` (${node.data.role})` : "";
     lines.push(`${prefix}**${node.data.label}**${roleTag}`);
     const children = childMap.get(nodeId) || [];
     for (const childId of children) {
@@ -115,6 +115,13 @@ export function generateClaudeMd(architecture) {
       }
     }
 
+    // File restrictions
+    const fileRestrictions = node.data.fileRestrictions || [];
+    if (fileRestrictions.length > 0) {
+      const patterns = fileRestrictions.map((p) => `\`${p}\``).join(", ");
+      lines.push(`- **File access**: Only touch files matching: ${patterns}`);
+    }
+
     // Children
     const children = childMap.get(node.id) || [];
     if (children.length > 0) {
@@ -133,6 +140,14 @@ export function generateClaudeMd(architecture) {
       }
     }
 
+    // System prompt
+    if (node.data.systemPrompt) {
+      lines.push("");
+      lines.push(`#### System Prompt`);
+      lines.push("");
+      lines.push(node.data.systemPrompt);
+    }
+
     lines.push("");
   }
 
@@ -142,8 +157,12 @@ export function generateClaudeMd(architecture) {
   lines.push("1. Each agent must stay within its defined capabilities. Do not perform actions outside your role.");
   lines.push("2. Supervisor agents coordinate work by delegating to their child agents.");
   lines.push("3. Worker agents complete their assigned tasks and report results back.");
-  lines.push("4. When spawning a sub-agent, include the agent's name and capabilities in the prompt.");
-  lines.push("5. Respect the hierarchy — only delegate to agents defined as your children.");
+  lines.push("4. Reviewer agents validate output quality and correctness before reporting back.");
+  lines.push("5. Tester agents write and run tests to verify functionality.");
+  lines.push("6. Planner agents break down tasks into subtasks and create execution plans.");
+  lines.push("7. When spawning a sub-agent, include the agent's name and capabilities in the prompt.");
+  lines.push("8. Respect the hierarchy — only delegate to agents defined as your children.");
+  lines.push("9. If file access restrictions are defined, only read or modify files matching those patterns.");
   lines.push("");
 
   return lines.join("\n");

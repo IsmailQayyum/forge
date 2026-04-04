@@ -1,6 +1,8 @@
 import React, { useState } from "react";
-import { X } from "lucide-react";
+import { X, ChevronDown, ChevronRight } from "lucide-react";
 import clsx from "clsx";
+
+const ROLES = ["supervisor", "worker", "reviewer", "tester", "planner"];
 
 const ALL_CAPABILITIES = [
   { id: "read_files", label: "Read files", group: "filesystem" },
@@ -35,7 +37,13 @@ const groups = [...new Set(ALL_CAPABILITIES.map((c) => c.group))];
 
 export function CapabilitiesPanel({ node, onUpdate, onClose }) {
   const [label, setLabel] = useState(node.data.label);
+  const [role, setRole] = useState(node.data.role || "");
+  const [systemPrompt, setSystemPrompt] = useState(node.data.systemPrompt || "");
+  const [fileRestrictions, setFileRestrictions] = useState(
+    (node.data.fileRestrictions || []).join(", ")
+  );
   const [capabilities, setCapabilities] = useState(new Set(node.data.capabilities || []));
+  const [capsExpanded, setCapsExpanded] = useState(true);
 
   function toggleCap(id) {
     const next = new Set(capabilities);
@@ -48,6 +56,25 @@ export function CapabilitiesPanel({ node, onUpdate, onClose }) {
   function updateLabel(v) {
     setLabel(v);
     onUpdate({ label: v });
+  }
+
+  function updateRole(v) {
+    setRole(v);
+    onUpdate({ role: v });
+  }
+
+  function updateSystemPrompt(v) {
+    setSystemPrompt(v);
+    onUpdate({ systemPrompt: v });
+  }
+
+  function updateFileRestrictions(v) {
+    setFileRestrictions(v);
+    const patterns = v
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    onUpdate({ fileRestrictions: patterns });
   }
 
   return (
@@ -70,45 +97,92 @@ export function CapabilitiesPanel({ node, onUpdate, onClose }) {
           />
         </div>
 
-        {/* Capabilities */}
+        {/* Role */}
         <div>
-          <label className="text-[10px] text-forge-muted uppercase tracking-wider mb-2 block">
-            Capabilities
-          </label>
-          <div className="flex flex-col gap-3">
-            {groups.map((group) => (
-              <div key={group}>
-                <p className={clsx("text-[10px] font-semibold mb-1.5 capitalize", GROUP_COLORS[group])}>
-                  {group}
-                </p>
-                <div className="flex flex-col gap-1">
-                  {ALL_CAPABILITIES.filter((c) => c.group === group).map((cap) => (
-                    <label
-                      key={cap.id}
-                      className="flex items-center gap-2 cursor-pointer group"
-                    >
-                      <div
-                        className={clsx(
-                          "w-4 h-4 rounded border flex items-center justify-center transition-colors",
-                          capabilities.has(cap.id)
-                            ? "bg-forge-accent border-forge-accent"
-                            : "border-forge-border group-hover:border-forge-muted"
-                        )}
-                        onClick={() => toggleCap(cap.id)}
-                      >
-                        {capabilities.has(cap.id) && (
-                          <svg width="8" height="8" viewBox="0 0 8 8">
-                            <path d="M1 4l2 2 4-4" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" />
-                          </svg>
-                        )}
-                      </div>
-                      <span className="text-xs text-forge-text">{cap.label}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
+          <label className="text-[10px] text-forge-muted uppercase tracking-wider mb-1.5 block">Role</label>
+          <select
+            value={role}
+            onChange={(e) => updateRole(e.target.value)}
+            className="w-full bg-forge-bg border border-forge-border rounded-lg px-3 py-2 text-xs text-forge-text outline-none focus:border-forge-muted appearance-none cursor-pointer"
+          >
+            <option value="">Select a role...</option>
+            {ROLES.map((r) => (
+              <option key={r} value={r}>
+                {r.charAt(0).toUpperCase() + r.slice(1)}
+              </option>
             ))}
-          </div>
+          </select>
+        </div>
+
+        {/* System Prompt */}
+        <div>
+          <label className="text-[10px] text-forge-muted uppercase tracking-wider mb-1.5 block">System Prompt</label>
+          <textarea
+            value={systemPrompt}
+            onChange={(e) => updateSystemPrompt(e.target.value)}
+            rows={4}
+            placeholder="Custom instructions for this agent..."
+            className="w-full bg-forge-bg border border-forge-border rounded-lg px-3 py-2 text-xs text-forge-text outline-none focus:border-forge-muted resize-none"
+          />
+        </div>
+
+        {/* File Restrictions */}
+        <div>
+          <label className="text-[10px] text-forge-muted uppercase tracking-wider mb-1.5 block">File Restrictions</label>
+          <input
+            value={fileRestrictions}
+            onChange={(e) => updateFileRestrictions(e.target.value)}
+            placeholder="src/**/*.ts, tests/**"
+            className="w-full bg-forge-bg border border-forge-border rounded-lg px-3 py-2 text-xs text-forge-text outline-none focus:border-forge-muted"
+          />
+          <p className="text-[10px] text-forge-muted mt-1">Comma-separated glob patterns</p>
+        </div>
+
+        {/* Capabilities (collapsible) */}
+        <div>
+          <button
+            onClick={() => setCapsExpanded(!capsExpanded)}
+            className="flex items-center gap-1 text-[10px] text-forge-muted uppercase tracking-wider mb-2 w-full"
+          >
+            {capsExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            <span>Capabilities</span>
+          </button>
+          {capsExpanded && (
+            <div className="flex flex-col gap-3">
+              {groups.map((group) => (
+                <div key={group}>
+                  <p className={clsx("text-[10px] font-semibold mb-1.5 capitalize", GROUP_COLORS[group])}>
+                    {group}
+                  </p>
+                  <div className="flex flex-col gap-1">
+                    {ALL_CAPABILITIES.filter((c) => c.group === group).map((cap) => (
+                      <label
+                        key={cap.id}
+                        className="flex items-center gap-2 cursor-pointer group"
+                      >
+                        <div
+                          className={clsx(
+                            "w-4 h-4 rounded border flex items-center justify-center transition-colors",
+                            capabilities.has(cap.id)
+                              ? "bg-forge-accent border-forge-accent"
+                              : "border-forge-border group-hover:border-forge-muted"
+                          )}
+                          onClick={() => toggleCap(cap.id)}
+                        >
+                          {capabilities.has(cap.id) && (
+                            <svg width="8" height="8" viewBox="0 0 8 8">
+                              <path d="M1 4l2 2 4-4" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+                            </svg>
+                          )}
+                        </div>
+                        <span className="text-xs text-forge-text">{cap.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
