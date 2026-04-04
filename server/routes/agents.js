@@ -117,6 +117,20 @@ agentsRouter.post("/runs/:runId/agents/:nodeId/complete", (req, res) => {
   res.json({ ok });
 });
 
+// Get agent output (for viewing completed agent's terminal history)
+agentsRouter.get("/runs/:runId/agents/:nodeId/output", (req, res) => {
+  const run = runManager.getRun(req.params.runId);
+  if (!run) return res.status(404).json({ error: "Run not found" });
+  const agent = run.agents[req.params.nodeId];
+  if (!agent) return res.status(404).json({ error: "Agent not found" });
+  res.json({
+    nodeId: agent.nodeId,
+    label: agent.label,
+    status: agent.status,
+    output: agent.output || "",
+  });
+});
+
 agentsRouter.delete("/:id", (req, res) => {
   agentStore.deleteArchitecture(req.params.id);
   res.json({ ok: true });

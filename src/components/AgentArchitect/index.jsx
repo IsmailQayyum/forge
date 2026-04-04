@@ -170,7 +170,9 @@ export function AgentArchitect() {
   const [workflowEnabled, setWorkflowEnabled] = useState(false);
   const [showRegistryPicker, setShowRegistryPicker] = useState(false);
   const [registryAgents, setRegistryAgents] = useState([]);
+  const [panelWidth, setPanelWidth] = useState(40); // percentage
   const wsRef = useRef(null);
+  const dragRef = useRef(null);
 
   const saveArchitecture = useForgeStore((s) => s.saveArchitecture);
 
@@ -536,15 +538,38 @@ export function AgentArchitect() {
     await fetch(`/api/agents/runs/${activeRun.runId}/agents/${nodeId}/complete`, { method: "POST" });
   }
 
-  // Click node — during run, focus the agent's terminal. Otherwise, select for config.
+  // Click node — during run, focus the agent's terminal/output. Otherwise, select for config.
   function handleNodeClick(_, node) {
-    if (activeRun && activeRun.agents[node.id]?.terminalId) {
+    if (activeRun && activeRun.agents[node.id]) {
       setFocusedAgent(node.id);
       setSelectedNode(null);
+      // If completed, fetch output
+      const agent = activeRun.agents[node.id];
+      if (agent.status === "completed" && !agent.outputFetched) {
+        fetchAgentOutput(node.id);
+      }
     } else {
       setSelectedNode(node);
       setFocusedAgent(null);
     }
+  }
+
+  async function fetchAgentOutput(nodeId) {
+    if (!activeRun) return;
+    try {
+      const res = await fetch(`/api/agents/runs/${activeRun.runId}/agents/${nodeId}/output`);
+      const data = await res.json();
+      setActiveRun((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          agents: {
+            ...prev.agents,
+            [nodeId]: { ...prev.agents[nodeId], output: data.output, outputFetched: true },
+          },
+        };
+      });
+    } catch {}
   }
 
   // ── Derived state ──
@@ -552,7 +577,10 @@ export function AgentArchitect() {
   const runAgents = activeRun ? Object.values(activeRun.agents) : [];
   const completedCount = runAgents.filter((a) => a.status === "completed").length;
   const runningCount = runAgents.filter((a) => a.status === "running").length;
-  const focusedTerminalId = focusedAgent && activeRun?.agents[focusedAgent]?.terminalId;
+  const focusedAgentData = focusedAgent && activeRun?.agents[focusedAgent];
+  const focusedTerminalId = focusedAgentData?.status === "running" ? focusedAgentData?.terminalId : null;
+  const focusedOutput = focusedAgentData?.status === "completed" ? focusedAgentData?.output : null;
+  const showRightPanel = focusedAgent && activeRun && (focusedTerminalId || focusedAgentData?.status === "completed");
   const hasTriggers = nodes.some((n) => n.type === "triggerNode");
 
   // ── Architecture list view ──
@@ -694,7 +722,7 @@ export function AgentArchitect() {
   return (
     <div className="flex h-full">
       {/* Left: Canvas */}
-      <div className={clsx("flex flex-col min-w-0", focusedTerminalId ? "w-[55%]" : "flex-1")}>
+      <div className={clsx("flex flex-col min-w-0", showRightPanel ? "flex-1" : "flex-1")} style={showRightPanel ? { width: `${100 - panelWidth}%` } : undefined}>
         {/* Toolbar */}
         <div className="px-4 py-2.5 border-b border-forge-border flex items-center gap-2">
           <button
@@ -958,51 +986,88 @@ export function AgentArchitect() {
         </div>
       </div>
 
-      {/* Right panel — Agent terminal (during run) or Config panel */}
-      {focusedTerminalId ? (
-        <div className="w-[45%] border-l border-forge-border flex flex-col bg-forge-bg">
-          {/* Terminal header */}
-          <div className="px-3 py-2 border-b border-forge-border flex items-center gap-2 shrink-0 bg-forge-surface/50">
-            <TerminalIcon size={12} className="text-forge-accent" />
-            <span className="text-xs font-semibold text-forge-text">
-              {activeRun?.agents[focusedAgent]?.label || "Agent Terminal"}
-            </span>
-            <span className={clsx(
-              "text-[9px] px-1.5 py-0.5 rounded-full font-medium",
-              activeRun?.agents[focusedAgent]?.status === "running"
-                ? "bg-forge-accent/20 text-forge-accent"
-                : activeRun?.agents[focusedAgent]?.status === "completed"
-                ? "bg-forge-green/20 text-forge-green"
-                : "bg-forge-border text-forge-muted"
-            )}>
-              {activeRun?.agents[focusedAgent]?.status}
-            </span>
-            <div className="ml-auto flex items-center gap-1">
-              {activeRun?.agents[focusedAgent]?.status === "running" && (
+      {/* Right panel — Agent terminal/output (during/after run) or Config panel */}
+      {showRightPanel ? (
+        <>
+          {/* Resize handle */}
+          <div
+            className="w-1 cursor-col-resize bg-forge-border hover:bg-forge-accent/50 transition-colors shrink-0"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              const startX = e.clientX;
+              const startWidth = panelWidth;
+              const container = e.target.parentElement;
+              const totalWidth = container?.offsetWidth || window.innerWidth;
+              function onMove(ev) {
+                const delta = startX - ev.clientX;
+                const newPct = startWidth + (delta / totalWidth) * 100;
+                setPanelWidth(Math.min(70, Math.max(20, newPct)));
+              }
+              function onUp() {
+                document.removeEventListener("mousemove", onMove);
+                document.removeEventListener("mouseup", onUp);
+              }
+              document.addEventListener("mousemove", onMove);
+              document.addEventListener("mouseup", onUp);
+            }}
+          />
+          <div style={{ width: `${panelWidth}%` }} className="flex flex-col bg-forge-bg shrink-0">
+            {/* Panel header */}
+            <div className="px-3 py-2 border-b border-forge-border flex items-center gap-2 shrink-0 bg-forge-surface/50">
+              <TerminalIcon size={12} className="text-forge-accent" />
+              <span className="text-xs font-semibold text-forge-text">
+                {focusedAgentData?.label || "Agent"}
+              </span>
+              <span className={clsx(
+                "text-[9px] px-1.5 py-0.5 rounded-full font-medium",
+                focusedAgentData?.status === "running"
+                  ? "bg-forge-accent/20 text-forge-accent"
+                  : focusedAgentData?.status === "completed"
+                  ? "bg-forge-green/20 text-forge-green"
+                  : "bg-forge-border text-forge-muted"
+              )}>
+                {focusedAgentData?.status}
+              </span>
+              <div className="ml-auto flex items-center gap-1">
+                {focusedAgentData?.status === "running" && (
+                  <button
+                    onClick={() => markAgentDone(focusedAgent)}
+                    className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] bg-forge-green/20 border border-forge-green/40 text-forge-green hover:bg-forge-green/30 transition-colors"
+                  >
+                    <Check size={10} /> Mark Done
+                  </button>
+                )}
                 <button
-                  onClick={() => markAgentDone(focusedAgent)}
-                  className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] bg-forge-green/20 border border-forge-green/40 text-forge-green hover:bg-forge-green/30 transition-colors"
+                  onClick={() => setFocusedAgent(null)}
+                  className="p-1 rounded text-forge-muted hover:text-forge-text"
                 >
-                  <Check size={10} /> Mark Done
+                  <X size={12} />
                 </button>
+              </div>
+            </div>
+
+            {/* Content: live terminal or static output */}
+            <div className="flex-1 min-h-0">
+              {focusedTerminalId ? (
+                <XTerminal
+                  key={focusedTerminalId}
+                  terminalId={focusedTerminalId}
+                  wsRef={wsRef}
+                />
+              ) : focusedAgentData?.status === "completed" ? (
+                <AgentOutputViewer
+                  output={focusedOutput}
+                  label={focusedAgentData?.label}
+                  onFetch={() => fetchAgentOutput(focusedAgent)}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full text-xs text-forge-muted">
+                  Waiting for agent to start...
+                </div>
               )}
-              <button
-                onClick={() => setFocusedAgent(null)}
-                className="p-1 rounded text-forge-muted hover:text-forge-text"
-              >
-                <X size={12} />
-              </button>
             </div>
           </div>
-          {/* Terminal */}
-          <div className="flex-1 min-h-0">
-            <XTerminal
-              key={focusedTerminalId}
-              terminalId={focusedTerminalId}
-              wsRef={wsRef}
-            />
-          </div>
-        </div>
+        </>
       ) : selectedNode && !isRunning ? (
         selectedNode.type === "triggerNode" ? (
           <TriggerPanel
@@ -1024,6 +1089,41 @@ export function AgentArchitect() {
           />
         )
       ) : null}
+    </div>
+  );
+}
+
+
+// ── Agent Output Viewer (for completed agents) ──
+function AgentOutputViewer({ output, label, onFetch }) {
+  const outputRef = useRef(null);
+
+  useEffect(() => {
+    if (!output && onFetch) onFetch();
+  }, []);
+
+  useEffect(() => {
+    if (outputRef.current) {
+      outputRef.current.scrollTop = outputRef.current.scrollHeight;
+    }
+  }, [output]);
+
+  if (!output && output !== "") {
+    return (
+      <div className="flex items-center justify-center h-full text-xs text-forge-muted">
+        Loading output...
+      </div>
+    );
+  }
+
+  // Strip ANSI codes for display
+  const clean = output
+    .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "")
+    .replace(/\r/g, "");
+
+  return (
+    <div ref={outputRef} className="h-full overflow-y-auto p-4 font-mono text-[11px] text-forge-text leading-relaxed whitespace-pre-wrap bg-[#0e0e10]">
+      {clean || <span className="text-forge-muted">No output captured</span>}
     </div>
   );
 }
