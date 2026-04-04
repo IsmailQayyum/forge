@@ -496,6 +496,10 @@ export function AgentArchitect() {
   async function executeArchitecture(targetDir, autoApprove = false) {
     setShowRunDialog(false);
 
+    // Reset everything from previous run
+    setActiveRun(null);
+    setFocusedAgent(null);
+
     // Save first
     const id = savedArchId || `arch-${Date.now()}`;
     const arch = { id, name: archName, nodes, edges, updatedAt: Date.now() };
@@ -506,8 +510,11 @@ export function AgentArchitect() {
       body: JSON.stringify(arch),
     });
 
-    // Mark all nodes as pending
-    setNodes((nds) => nds.map((n) => ({ ...n, data: { ...n.data, runStatus: "pending" } })));
+    // Clear old status and mark all nodes as pending
+    setNodes((nds) => nds.map((n) => ({
+      ...n,
+      data: { ...n.data, runStatus: "pending", runActivity: undefined },
+    })));
 
     try {
       const res = await fetch(`/api/agents/${id}/execute`, {
@@ -540,7 +547,8 @@ export function AgentArchitect() {
 
   // Click node — during run, focus the agent's terminal/output. Otherwise, select for config.
   function handleNodeClick(_, node) {
-    if (activeRun && activeRun.agents[node.id]) {
+    // Only agent nodes have terminals/output — trigger/action nodes go to config
+    if (activeRun && activeRun.agents[node.id] && node.type === "agentNode") {
       setFocusedAgent(node.id);
       setSelectedNode(null);
       // If completed, fetch output
@@ -941,7 +949,12 @@ export function AgentArchitect() {
                 {runAgents.map((a) => (
                   <button
                     key={a.nodeId}
-                    onClick={() => setFocusedAgent(a.nodeId)}
+                    onClick={() => {
+                      setFocusedAgent(a.nodeId);
+                      if (a.status === "completed" && !a.outputFetched) {
+                        fetchAgentOutput(a.nodeId);
+                      }
+                    }}
                     className={clsx(
                       "flex-1 flex flex-col items-start gap-0.5 px-3 py-2 transition-all min-w-0",
                       focusedAgent === a.nodeId
