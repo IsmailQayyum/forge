@@ -14,6 +14,9 @@ costsRouter.get("/entries", (req, res) => {
 // Called internally when token usage updates
 costsRouter.post("/record", (req, res) => {
   const { sessionId, project, usage } = req.body;
-  const entry = costStore.record(sessionId, project, usage);
+  if (!usage || typeof usage !== "object") {
+    return res.status(400).json({ error: "usage object required" });
+  }
+  const entry = costStore.record(sessionId, project || "unknown", usage);
   res.json(entry);
 });

@@ -36,13 +36,14 @@ const GROUP_COLORS = {
 const groups = [...new Set(ALL_CAPABILITIES.map((c) => c.group))];
 
 export function CapabilitiesPanel({ node, onUpdate, onClose }) {
-  const [label, setLabel] = useState(node.data.label);
-  const [role, setRole] = useState(node.data.role || "");
-  const [systemPrompt, setSystemPrompt] = useState(node.data.systemPrompt || "");
+  const data = node?.data || {};
+  const [label, setLabel] = useState(data.label);
+  const [role, setRole] = useState(data.role || "");
+  const [systemPrompt, setSystemPrompt] = useState(data.systemPrompt || "");
   const [fileRestrictions, setFileRestrictions] = useState(
-    (node.data.fileRestrictions || []).join(", ")
+    (data.fileRestrictions || []).join(", ")
   );
-  const [capabilities, setCapabilities] = useState(new Set(node.data.capabilities || []));
+  const [capabilities, setCapabilities] = useState(new Set(data.capabilities || []));
   const [capsExpanded, setCapsExpanded] = useState(true);
 
   function toggleCap(id) {

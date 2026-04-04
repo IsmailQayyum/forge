@@ -45,10 +45,8 @@ export default function App() {
         setActiveView(view);
       }
     }
-    window.addEventListener("forge:navigate", handleNavigate);
     window.addEventListener("navigate-to", handleNavigate);
     return () => {
-      window.removeEventListener("forge:navigate", handleNavigate);
       window.removeEventListener("navigate-to", handleNavigate);
     };
   }, []);

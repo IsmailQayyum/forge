@@ -37,7 +37,7 @@ export function QuickActions() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ args: ["-p", action.prompt] }),
       });
-      window.dispatchEvent(new CustomEvent("forge:navigate", { detail: { view: "messenger" } }));
+      window.dispatchEvent(new CustomEvent("navigate-to", { detail: { view: "messenger" } }));
     } catch {}
     setLaunching(null);
   }

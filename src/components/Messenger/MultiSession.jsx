@@ -149,9 +149,13 @@ export function MultiSession({ wsRef }) {
             <p className="text-xs max-w-sm">Run multiple Claude Code sessions in parallel. Great for frontend + backend + tests simultaneously.</p>
           </div>
           <div className="flex gap-2">
-            {[{ label: "Frontend", color: "blue" }, { label: "Backend", color: "green" }, { label: "Tests", color: "yellow" }].map(({ label, color }) => (
+            {[
+              { label: "Frontend", cls: "bg-blue-500/20 border-blue-500/30 text-blue-400 hover:bg-blue-500/30" },
+              { label: "Backend", cls: "bg-green-500/20 border-green-500/30 text-green-400 hover:bg-green-500/30" },
+              { label: "Tests", cls: "bg-yellow-500/20 border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/30" },
+            ].map(({ label, cls }) => (
               <button key={label} onClick={() => spawnSession("", label)}
-                className={`px-3 py-1.5 rounded-lg bg-${color}-500/20 border border-${color}-500/30 text-${color}-400 text-[10px] font-semibold hover:bg-${color}-500/30`}>
+                className={`px-3 py-1.5 rounded-lg border text-[10px] font-semibold ${cls}`}>
                 + {label}
               </button>
             ))}

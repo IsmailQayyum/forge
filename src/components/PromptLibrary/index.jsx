@@ -49,7 +49,7 @@ export function PromptLibrary() {
     const data = await res.json();
     if (data.terminalId) {
       // Navigate to messenger — we'll use a custom event
-      window.dispatchEvent(new CustomEvent("forge:navigate", { detail: { view: "messenger" } }));
+      window.dispatchEvent(new CustomEvent("navigate-to", { detail: { view: "messenger" } }));
     }
   }
 

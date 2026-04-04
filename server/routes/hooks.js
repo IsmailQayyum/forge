@@ -50,14 +50,14 @@ hooksRouter.post("/", (req, res) => {
           status: "done",
           project,
         });
-        // Fire webhook notification
+        // Fire webhook notification (fire-and-forget)
         notificationStore.notify({
           type: "session_end",
           title: "Session Completed",
           message: `Claude Code session finished in ${project}`,
           project,
           sessionId,
-        });
+        }).catch(() => {});
         break;
     }
   }
@@ -93,14 +93,14 @@ hooksRouter.post("/permission", (req, res) => {
     });
   }
 
-  // Fire webhook
+  // Fire webhook (fire-and-forget)
   notificationStore.notify({
     type: "permission_needed",
     title: "Permission Required",
     message: `${tool} needs approval in ${project}`,
     project,
     sessionId,
-  });
+  }).catch(() => {});
 
   res.json({ ok: true, permissionId });
 });

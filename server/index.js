@@ -208,9 +208,10 @@ wss.on("connection", (ws) => {
 });
 
 function handleClientMessage(msg, ws) {
+  const p = msg.payload;
   switch (msg.type) {
     case "SESSION_INPUT":
-      sessionWatcher.sendInput(msg.payload.sessionId, msg.payload.text);
+      if (p?.sessionId && p?.text) sessionWatcher.sendInput(p.sessionId, p.text);
       break;
 
     case "PING":
@@ -219,19 +220,19 @@ function handleClientMessage(msg, ws) {
 
     // ── Terminal I/O ──
     case "TERMINAL_INPUT":
-      writeToTerminal(msg.payload.terminalId, msg.payload.data);
+      if (p?.terminalId && p?.data) writeToTerminal(p.terminalId, p.data);
       break;
 
     case "TERMINAL_RESIZE":
-      resizeTerminal(msg.payload.terminalId, msg.payload.cols, msg.payload.rows);
+      if (p?.terminalId) resizeTerminal(p.terminalId, p.cols, p.rows);
       break;
 
     case "TERMINAL_ATTACH":
-      attachClient(msg.payload.terminalId, ws);
+      if (p?.terminalId) attachClient(p.terminalId, ws);
       break;
 
     case "TERMINAL_DETACH":
-      detachClient(msg.payload.terminalId, ws);
+      if (p?.terminalId) detachClient(p.terminalId, ws);
       break;
   }
 }
