@@ -58,6 +58,7 @@ export function spawnTerminal({ cwd, args = [], terminalId, shell }) {
     pid: ptyProcess.pid,
     outputBuffer: [],      // stores last N lines for agent output capture
     maxBuffer: 500,
+    onDataCallbacks: [],   // callbacks for live data (run engine activity tracking)
     onExitCallbacks: [],   // callbacks when terminal exits
   };
 

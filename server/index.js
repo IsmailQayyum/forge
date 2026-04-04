@@ -73,6 +73,11 @@ app.get("/api/fs/browse", (req, res) => {
   const dir = req.query.path || os.homedir();
   try {
     const resolved = path.resolve(dir.replace(/^~/, os.homedir()));
+    // Prevent traversal outside home directory
+    const home = os.homedir();
+    if (!resolved.startsWith(home) && !resolved.startsWith("/tmp")) {
+      return res.status(403).json({ error: "Access denied" });
+    }
     const entries = fs.readdirSync(resolved, { withFileTypes: true });
     const dirs = entries
       .filter(e => e.isDirectory() && !e.name.startsWith("."))

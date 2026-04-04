@@ -56,17 +56,17 @@ export function RunSummary({ run, onClose, onViewDiff, onViewAgent }) {
             ) : (
               <CheckCircle2 className="w-4 h-4 text-green-400" />
             )}
-            <span className="text-forge-text-primary">
+            <span className="text-forge-text">
               {runFailed ? "Run Failed" : "Run Complete"}
             </span>
-            <span className="text-forge-text-muted">·</span>
-            <span className="text-forge-text-muted">
+            <span className="text-forge-muted">·</span>
+            <span className="text-forge-muted">
               {agentCount} agent{agentCount !== 1 ? "s" : ""}
             </span>
             {run.duration != null && (
               <>
-                <span className="text-forge-text-muted">·</span>
-                <span className="text-forge-text-muted flex items-center gap-1">
+                <span className="text-forge-muted">·</span>
+                <span className="text-forge-muted flex items-center gap-1">
                   <Clock className="w-3.5 h-3.5" />
                   {formatDuration(run.duration)}
                 </span>
@@ -75,7 +75,7 @@ export function RunSummary({ run, onClose, onViewDiff, onViewAgent }) {
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded hover:bg-forge-border/50 text-forge-text-muted hover:text-forge-text-primary transition-colors"
+            className="p-1 rounded hover:bg-forge-border/50 text-forge-muted hover:text-forge-text transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -84,7 +84,7 @@ export function RunSummary({ run, onClose, onViewDiff, onViewAgent }) {
         {/* Agent Results */}
         {agents.length > 0 && (
           <div className="px-4 py-2">
-            <div className="text-xs font-medium text-forge-text-muted uppercase tracking-wide mb-1.5">
+            <div className="text-xs font-medium text-forge-muted uppercase tracking-wide mb-1.5">
               Agent Results
             </div>
             <div className="space-y-0.5 max-h-48 overflow-y-auto">
@@ -104,14 +104,14 @@ export function RunSummary({ run, onClose, onViewDiff, onViewAgent }) {
                     ) : (
                       <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0" />
                     )}
-                    <span className="font-medium text-forge-text-primary min-w-[120px]">
+                    <span className="font-medium text-forge-text min-w-[120px]">
                       {agent.label || nodeId}
                     </span>
-                    <span className="text-forge-text-muted text-xs min-w-[80px]">
+                    <span className="text-forge-muted text-xs min-w-[80px]">
                       {agent.role || "agent"}
                     </span>
                     {agent.lastActivity && (
-                      <span className="text-forge-text-muted text-xs truncate ml-auto max-w-[240px] opacity-70 group-hover:opacity-100 transition-opacity">
+                      <span className="text-forge-muted text-xs truncate ml-auto max-w-[240px] opacity-70 group-hover:opacity-100 transition-opacity">
                         {agent.lastActivity}
                       </span>
                     )}
@@ -129,7 +129,7 @@ export function RunSummary({ run, onClose, onViewDiff, onViewAgent }) {
               onClick={onViewDiff}
               className={clsx(
                 "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium",
-                "bg-forge-border/40 hover:bg-forge-border/70 text-forge-text-primary transition-colors"
+                "bg-forge-border/40 hover:bg-forge-border/70 text-forge-text transition-colors"
               )}
             >
               <GitCompare className="w-3.5 h-3.5" />
@@ -140,7 +140,7 @@ export function RunSummary({ run, onClose, onViewDiff, onViewAgent }) {
             onClick={() => exportReport(run)}
             className={clsx(
               "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium",
-              "bg-forge-border/40 hover:bg-forge-border/70 text-forge-text-primary transition-colors"
+              "bg-forge-border/40 hover:bg-forge-border/70 text-forge-text transition-colors"
             )}
           >
             <Download className="w-3.5 h-3.5" />
