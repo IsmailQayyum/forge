@@ -10,17 +10,21 @@ import ReactFlow, {
 import "reactflow/dist/style.css";
 import { useForgeStore } from "../../store/index.js";
 import { AgentNode } from "./AgentNode.jsx";
+import { TriggerNode } from "./TriggerNode.jsx";
+import { ActionNode } from "./ActionNode.jsx";
 import { CapabilitiesPanel } from "./CapabilitiesPanel.jsx";
+import { TriggerPanel } from "./TriggerPanel.jsx";
+import { ActionPanel } from "./ActionPanel.jsx";
 import { XTerminal } from "../Messenger/XTerminal.jsx";
 import {
   GitBranch, Plus, Save, Trash2, FileDown, Play, Upload, Download,
   ChevronDown, FolderOpen, Layers, Zap, Shield, Code, Bug, BookOpen,
   X, Check, MoreHorizontal, Square, Clock, CheckCircle2, Loader2,
-  Terminal as TerminalIcon,
+  Terminal as TerminalIcon, GitPullRequest, Bell, Webhook, Bot,
 } from "lucide-react";
 import clsx from "clsx";
 
-const NODE_TYPES = { agentNode: AgentNode };
+const NODE_TYPES = { agentNode: AgentNode, triggerNode: TriggerNode, actionNode: ActionNode };
 
 // ── Pre-built workflow templates ──
 const TEMPLATES = [
@@ -45,19 +49,27 @@ const TEMPLATES = [
   {
     id: "pr-review",
     name: "PR Review Pipeline",
-    description: "Security reviewer, code reviewer, and test validator analyze a pull request",
+    description: "Triggered by GitHub PR — security, code quality, and tests run in parallel, then auto-comment results",
     icon: Shield,
     color: "text-forge-green",
     nodes: [
-      { id: "lead", type: "agentNode", position: { x: 300, y: 50 }, data: { label: "Review Lead", role: "supervisor", capabilities: ["read_files", "run_commands", "spawn_agents", "github_read", "github_pr"], systemPrompt: "You coordinate PR reviews. Gather findings from security, code quality, and test agents, then write a consolidated review comment." } },
-      { id: "security", type: "agentNode", position: { x: 80, y: 220 }, data: { label: "Security Reviewer", role: "reviewer", capabilities: ["read_files", "run_commands"], systemPrompt: "Audit the code for OWASP Top 10 vulnerabilities, injection risks, auth issues, and secret leaks. Report findings with severity levels." } },
-      { id: "quality", type: "agentNode", position: { x: 350, y: 220 }, data: { label: "Code Quality", role: "reviewer", capabilities: ["read_files", "run_commands"], systemPrompt: "Review code for maintainability, naming conventions, error handling, and adherence to project patterns. Suggest improvements." } },
-      { id: "tests", type: "agentNode", position: { x: 620, y: 220 }, data: { label: "Test Validator", role: "tester", capabilities: ["read_files", "run_commands"], systemPrompt: "Run the existing test suite, check for regressions, and verify that new code has adequate test coverage." } },
+      { id: "trigger-pr", type: "triggerNode", position: { x: 300, y: 0 }, data: { label: "PR Opened", triggerType: "github_pr", config: { repo: "", events: ["opened", "synchronize"] } } },
+      { id: "lead", type: "agentNode", position: { x: 300, y: 120 }, data: { label: "Review Lead", role: "supervisor", capabilities: ["read_files", "run_commands", "spawn_agents", "github_read", "github_pr"], systemPrompt: "You coordinate PR reviews. Gather findings from security, code quality, and test agents, then write a consolidated review comment." } },
+      { id: "security", type: "agentNode", position: { x: 60, y: 280 }, data: { label: "Security Reviewer", role: "reviewer", capabilities: ["read_files", "run_commands"], systemPrompt: "Audit the code for OWASP Top 10 vulnerabilities, injection risks, auth issues, and secret leaks. Report findings with severity levels." } },
+      { id: "quality", type: "agentNode", position: { x: 310, y: 280 }, data: { label: "Code Quality", role: "reviewer", capabilities: ["read_files", "run_commands"], systemPrompt: "Review code for maintainability, naming conventions, error handling, and adherence to project patterns. Suggest improvements." } },
+      { id: "tests", type: "agentNode", position: { x: 560, y: 280 }, data: { label: "Test Validator", role: "tester", capabilities: ["read_files", "run_commands"], systemPrompt: "Run the existing test suite, check for regressions, and verify that new code has adequate test coverage." } },
+      { id: "action-comment", type: "actionNode", position: { x: 200, y: 440 }, data: { label: "Post Review", actionType: "github_comment", config: { template: "## Forge Review\n\n{{output}}" } } },
+      { id: "action-slack", type: "actionNode", position: { x: 450, y: 440 }, data: { label: "Notify Team", actionType: "slack_message", config: { channel: "#code-reviews", template: "PR review complete for {{workflow}}" } } },
     ],
     edges: [
+      { id: "e0", source: "trigger-pr", target: "lead", animated: true, style: { stroke: "#a855f7" } },
       { id: "e1", source: "lead", target: "security", animated: true, style: { stroke: "#f97316" } },
       { id: "e2", source: "lead", target: "quality", animated: true, style: { stroke: "#f97316" } },
       { id: "e3", source: "lead", target: "tests", animated: true, style: { stroke: "#f97316" } },
+      { id: "e4", source: "security", target: "action-comment", animated: true, style: { stroke: "#22c55e" } },
+      { id: "e5", source: "quality", target: "action-comment", animated: true, style: { stroke: "#22c55e" } },
+      { id: "e6", source: "tests", target: "action-comment", animated: true, style: { stroke: "#22c55e" } },
+      { id: "e7", source: "security", target: "action-slack", animated: true, style: { stroke: "#22c55e" } },
     ],
   },
   {
@@ -74,6 +86,29 @@ const TEMPLATES = [
     edges: [
       { id: "e1", source: "planner", target: "reproducer", animated: true, style: { stroke: "#f97316" } },
       { id: "e2", source: "planner", target: "fixer", animated: true, style: { stroke: "#f97316" } },
+    ],
+  },
+  {
+    id: "deploy-pipeline",
+    name: "Deploy Pipeline",
+    description: "Webhook triggers lint, test, security scan, then auto-creates PR and notifies Slack",
+    icon: Zap,
+    color: "text-yellow-400",
+    nodes: [
+      { id: "trigger-webhook", type: "triggerNode", position: { x: 300, y: 0 }, data: { label: "Deploy Webhook", triggerType: "webhook", config: { path: "/hooks/deploy" } } },
+      { id: "linter", type: "agentNode", position: { x: 100, y: 140 }, data: { label: "Lint Agent", role: "reviewer", capabilities: ["read_files", "run_commands"], systemPrompt: "Run the project linter. Fix all auto-fixable issues. Report remaining issues with file locations." } },
+      { id: "tester", type: "agentNode", position: { x: 350, y: 140 }, data: { label: "Test Agent", role: "tester", capabilities: ["read_files", "run_commands"], systemPrompt: "Run the full test suite. Report any failures with stack traces. Ensure all tests pass before proceeding." } },
+      { id: "scanner", type: "agentNode", position: { x: 600, y: 140 }, data: { label: "Security Scan", role: "reviewer", capabilities: ["read_files", "run_commands"], systemPrompt: "Run security scanners (npm audit, dependency check). Flag any critical or high severity vulnerabilities." } },
+      { id: "action-pr", type: "actionNode", position: { x: 200, y: 300 }, data: { label: "Create PR", actionType: "create_pr", config: { title: "[Forge] Automated deploy check", branch: "forge/deploy-{{timestamp}}" } } },
+      { id: "action-notify", type: "actionNode", position: { x: 500, y: 300 }, data: { label: "Slack Notify", actionType: "slack_message", config: { channel: "#deploys", template: "Deploy pipeline complete. All checks passed." } } },
+    ],
+    edges: [
+      { id: "e0", source: "trigger-webhook", target: "linter", animated: true, style: { stroke: "#a855f7" } },
+      { id: "e1", source: "trigger-webhook", target: "tester", animated: true, style: { stroke: "#a855f7" } },
+      { id: "e2", source: "trigger-webhook", target: "scanner", animated: true, style: { stroke: "#a855f7" } },
+      { id: "e3", source: "linter", target: "action-pr", animated: true, style: { stroke: "#22c55e" } },
+      { id: "e4", source: "tester", target: "action-pr", animated: true, style: { stroke: "#22c55e" } },
+      { id: "e5", source: "scanner", target: "action-notify", animated: true, style: { stroke: "#22c55e" } },
     ],
   },
   {
@@ -132,6 +167,9 @@ export function AgentArchitect() {
   const [activeRun, setActiveRun] = useState(null); // { runId, agents: { nodeId: { status, terminalId, label } } }
   const [showRunDialog, setShowRunDialog] = useState(false);
   const [focusedAgent, setFocusedAgent] = useState(null); // nodeId of agent whose terminal to show
+  const [workflowEnabled, setWorkflowEnabled] = useState(false);
+  const [showRegistryPicker, setShowRegistryPicker] = useState(false);
+  const [registryAgents, setRegistryAgents] = useState([]);
   const wsRef = useRef(null);
 
   const saveArchitecture = useForgeStore((s) => s.saveArchitecture);
@@ -256,6 +294,13 @@ export function AgentArchitect() {
     setShowTemplates(false);
     setActiveRun(null);
     setFocusedAgent(null);
+    // Check workflow status
+    if (arch.id) {
+      fetch(`/api/workflows/${arch.id}/status`)
+        .then((r) => r.json())
+        .then((d) => setWorkflowEnabled(d.enabled || false))
+        .catch(() => setWorkflowEnabled(false));
+    }
   }
 
   function loadTemplate(template) {
@@ -290,6 +335,67 @@ export function AgentArchitect() {
         type: "agentNode",
         position: { x: 100 + Math.random() * 400, y: 250 + Math.random() * 150 },
         data: { label: "New Agent", role: "worker", capabilities: ["read_files"] },
+      },
+    ]);
+  }
+
+  function addFromRegistry(registryAgent) {
+    const id = `agent-${Date.now()}`;
+    setNodes((nds) => [
+      ...nds,
+      {
+        id,
+        type: "agentNode",
+        position: { x: 100 + Math.random() * 400, y: 200 + Math.random() * 150 },
+        data: {
+          label: registryAgent.name,
+          role: registryAgent.role || "worker",
+          capabilities: registryAgent.capabilities || ["read_files"],
+          systemPrompt: registryAgent.systemPrompt || "",
+          fileRestrictions: registryAgent.fileRestrictions || [],
+          registryId: registryAgent.id, // link back to registry
+        },
+      },
+    ]);
+    setShowRegistryPicker(false);
+  }
+
+  async function openRegistryPicker() {
+    try {
+      const res = await fetch("/api/registry");
+      const data = await res.json();
+      // Also fetch presets
+      const presetsRes = await fetch("/api/registry/presets");
+      const presetsData = await presetsRes.json();
+      setRegistryAgents([...(data.agents || []), ...(presetsData.presets || [])]);
+    } catch {
+      setRegistryAgents([]);
+    }
+    setShowRegistryPicker(true);
+  }
+
+  function addTrigger() {
+    const id = `trigger-${Date.now()}`;
+    setNodes((nds) => [
+      ...nds,
+      {
+        id,
+        type: "triggerNode",
+        position: { x: 200 + Math.random() * 200, y: 20 },
+        data: { label: "New Trigger", triggerType: "manual", config: {} },
+      },
+    ]);
+  }
+
+  function addAction() {
+    const id = `action-${Date.now()}`;
+    setNodes((nds) => [
+      ...nds,
+      {
+        id,
+        type: "actionNode",
+        position: { x: 200 + Math.random() * 200, y: 400 + Math.random() * 100 },
+        data: { label: "New Action", actionType: "notification", config: {} },
       },
     ]);
   }
@@ -447,6 +553,7 @@ export function AgentArchitect() {
   const completedCount = runAgents.filter((a) => a.status === "completed").length;
   const runningCount = runAgents.filter((a) => a.status === "running").length;
   const focusedTerminalId = focusedAgent && activeRun?.agents[focusedAgent]?.terminalId;
+  const hasTriggers = nodes.some((n) => n.type === "triggerNode");
 
   // ── Architecture list view ──
   if (showList) {
@@ -632,8 +739,21 @@ export function AgentArchitect() {
                     <Trash2 size={11} /> Delete
                   </button>
                 )}
-                <button onClick={addAgent} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-forge-surface border border-forge-border text-[11px] text-forge-text hover:border-forge-muted transition-colors">
+                <button onClick={addTrigger} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-forge-surface border border-purple-500/30 text-[11px] text-purple-400 hover:border-purple-400 transition-colors">
+                  <Webhook size={11} /> Trigger
+                </button>
+                <button onClick={addAgent} className="flex items-center gap-1 px-2.5 py-1.5 rounded-l-lg bg-forge-surface border border-forge-border text-[11px] text-forge-text hover:border-forge-muted transition-colors">
                   <Plus size={11} /> Agent
+                </button>
+                <button
+                  onClick={openRegistryPicker}
+                  className="flex items-center gap-1 px-1.5 py-1.5 rounded-r-lg bg-forge-surface border border-l-0 border-forge-border text-[11px] text-forge-muted hover:text-forge-accent hover:border-forge-muted transition-colors"
+                  title="Add from Registry"
+                >
+                  <ChevronDown size={11} />
+                </button>
+                <button onClick={addAction} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-forge-surface border border-green-500/30 text-[11px] text-green-400 hover:border-green-400 transition-colors">
+                  <Bell size={11} /> Action
                 </button>
                 <div className="flex items-center gap-0.5 pl-1.5 border-l border-forge-border">
                   <button onClick={exportJson} className="p-1.5 rounded-md text-forge-muted hover:text-forge-text hover:bg-forge-border transition-colors" title="Export JSON">
@@ -651,6 +771,31 @@ export function AgentArchitect() {
                   <FileDown size={11} /> {exportStatus || "CLAUDE.md"}
                 </button>
               </>
+            )}
+
+            {/* Workflow toggle */}
+            {savedArchId && hasTriggers && !isRunning && (
+              <button
+                onClick={async () => {
+                  if (workflowEnabled) {
+                    await fetch(`/api/workflows/${savedArchId}/disable`, { method: "POST" });
+                    setWorkflowEnabled(false);
+                  } else {
+                    // Need to save first, then show dialog for target dir
+                    await save();
+                    setShowRunDialog("workflow");
+                  }
+                }}
+                className={clsx(
+                  "flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] border transition-colors",
+                  workflowEnabled
+                    ? "bg-purple-500/20 border-purple-400/40 text-purple-400 hover:bg-purple-500/30"
+                    : "bg-forge-surface border-forge-border text-forge-muted hover:text-purple-400 hover:border-purple-400"
+                )}
+              >
+                <Zap size={11} />
+                {workflowEnabled ? "Workflow On" : "Enable Workflow"}
+              </button>
             )}
 
             {isRunning ? (
@@ -689,6 +834,8 @@ export function AgentArchitect() {
                 if (status === "running") return "#f97316";
                 if (status === "completed") return "#22c55e";
                 if (status === "failed") return "#ef4444";
+                if (n.type === "triggerNode") return "#a855f7";
+                if (n.type === "actionNode") return "#22c55e";
                 return "#f97316";
               }}
               maskColor="rgba(14,14,16,0.8)"
@@ -696,12 +843,65 @@ export function AgentArchitect() {
             />
           </ReactFlow>
 
+          {/* Registry picker overlay */}
+          {showRegistryPicker && (
+            <div className="absolute top-12 left-1/2 -translate-x-1/2 z-20 w-96 max-h-[400px] bg-forge-surface border border-forge-border rounded-xl shadow-2xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-forge-border flex items-center justify-between">
+                <p className="text-xs font-semibold text-forge-text">Add Agent from Registry</p>
+                <button onClick={() => setShowRegistryPicker(false)} className="text-forge-muted hover:text-forge-text">
+                  <X size={14} />
+                </button>
+              </div>
+              <div className="overflow-y-auto max-h-[340px] p-2">
+                {registryAgents.length === 0 ? (
+                  <p className="text-xs text-forge-muted text-center py-6">No agents in registry. Create one in the Agents tab.</p>
+                ) : (
+                  registryAgents.map((agent) => (
+                    <button
+                      key={agent.id}
+                      onClick={() => addFromRegistry(agent)}
+                      className="w-full flex items-start gap-3 p-3 rounded-lg hover:bg-forge-bg/50 transition-colors text-left"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-forge-bg flex items-center justify-center shrink-0 mt-0.5">
+                        <Bot size={14} className="text-forge-accent" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs font-semibold text-forge-text">{agent.name}</p>
+                          <span className="text-[9px] text-forge-muted capitalize bg-forge-border rounded px-1 py-0.5">{agent.role}</span>
+                        </div>
+                        {agent.description && (
+                          <p className="text-[10px] text-forge-muted mt-0.5 truncate">{agent.description}</p>
+                        )}
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Run dialog overlay */}
           {showRunDialog && (
             <RunDialog
               archName={archName}
               agentCount={nodes.length}
-              onRun={executeArchitecture}
+              isWorkflowMode={showRunDialog === "workflow"}
+              onRun={async (targetDir, autoApprove) => {
+                if (showRunDialog === "workflow") {
+                  // Enable workflow mode
+                  await save();
+                  await fetch(`/api/workflows/${savedArchId}/enable`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ targetDir, autoApprove }),
+                  });
+                  setWorkflowEnabled(true);
+                  setShowRunDialog(false);
+                } else {
+                  executeArchitecture(targetDir, autoApprove);
+                }
+              }}
               onClose={() => setShowRunDialog(false)}
             />
           )}
@@ -804,11 +1004,25 @@ export function AgentArchitect() {
           </div>
         </div>
       ) : selectedNode && !isRunning ? (
-        <CapabilitiesPanel
-          node={selectedNode}
-          onUpdate={(data) => updateNodeData(selectedNode.id, data)}
-          onClose={() => setSelectedNode(null)}
-        />
+        selectedNode.type === "triggerNode" ? (
+          <TriggerPanel
+            node={selectedNode}
+            onUpdate={(data) => updateNodeData(selectedNode.id, data)}
+            onClose={() => setSelectedNode(null)}
+          />
+        ) : selectedNode.type === "actionNode" ? (
+          <ActionPanel
+            node={selectedNode}
+            onUpdate={(data) => updateNodeData(selectedNode.id, data)}
+            onClose={() => setSelectedNode(null)}
+          />
+        ) : (
+          <CapabilitiesPanel
+            node={selectedNode}
+            onUpdate={(data) => updateNodeData(selectedNode.id, data)}
+            onClose={() => setSelectedNode(null)}
+          />
+        )
       ) : null}
     </div>
   );
@@ -816,7 +1030,7 @@ export function AgentArchitect() {
 
 
 // ── Run Dialog ──
-function RunDialog({ archName, agentCount, onRun, onClose }) {
+function RunDialog({ archName, agentCount, isWorkflowMode, onRun, onClose }) {
   const [targetDir, setTargetDir] = useState("");
   const [autoApprove, setAutoApprove] = useState(false);
   const [projects, setProjects] = useState([]);
@@ -832,11 +1046,19 @@ function RunDialog({ archName, agentCount, onRun, onClose }) {
     <div className="absolute inset-0 z-20 bg-forge-bg/90 backdrop-blur-sm flex items-center justify-center">
       <div className="bg-forge-surface border border-forge-border rounded-xl w-full max-w-md shadow-2xl">
         <div className="px-5 py-4 border-b border-forge-border flex items-center gap-3">
-          <Play size={14} className="text-forge-green" />
+          {isWorkflowMode ? (
+            <Zap size={14} className="text-purple-400" />
+          ) : (
+            <Play size={14} className="text-forge-green" />
+          )}
           <div>
-            <p className="text-sm font-semibold text-forge-text">Run "{archName}"</p>
+            <p className="text-sm font-semibold text-forge-text">
+              {isWorkflowMode ? `Enable Workflow "${archName}"` : `Run "${archName}"`}
+            </p>
             <p className="text-[10px] text-forge-muted">
-              {agentCount} agents · Root agents start first, children start when parents finish
+              {isWorkflowMode
+                ? "Workflow will auto-execute when triggers fire"
+                : `${agentCount} agents · Root agents start first, children start when parents finish`}
             </p>
           </div>
           <button onClick={onClose} className="ml-auto p-1 rounded text-forge-muted hover:text-forge-text">
@@ -904,8 +1126,8 @@ function RunDialog({ archName, agentCount, onRun, onClose }) {
             disabled={!targetDir}
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-forge-green text-xs text-white font-semibold hover:bg-green-500 disabled:opacity-40 transition-colors"
           >
-            <Play size={12} />
-            Launch {agentCount} Agents
+            {isWorkflowMode ? <Zap size={12} /> : <Play size={12} />}
+            {isWorkflowMode ? "Enable Workflow" : `Launch ${agentCount} Agents`}
           </button>
         </div>
       </div>

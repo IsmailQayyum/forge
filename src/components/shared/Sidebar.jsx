@@ -1,7 +1,7 @@
 import React from "react";
 import {
   LayoutDashboard, MessageSquare, GitBranch, Paperclip, Plug,
-  Flame, BookOpen, DollarSign, FileText,
+  Flame, BookOpen, DollarSign, FileText, Bot,
 } from "lucide-react";
 import { useForgeStore } from "../../store/index.js";
 import clsx from "clsx";
@@ -14,7 +14,8 @@ const NAV_TOP = [
 ];
 
 const NAV_BOTTOM = [
-  { id: "architect", icon: GitBranch, label: "Architect" },
+  { id: "architect", icon: GitBranch, label: "Workflows" },
+  { id: "registry", icon: Bot, label: "Agents" },
   { id: "claudemd", icon: FileText, label: "CLAUDE.md" },
   { id: "context", icon: Paperclip, label: "Context" },
   { id: "integrations", icon: Plug, label: "Integrations" },

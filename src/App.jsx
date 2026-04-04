@@ -8,6 +8,7 @@ import { Integrations } from "./components/Integrations/index.jsx";
 import { PromptLibrary } from "./components/PromptLibrary/index.jsx";
 import { CostDashboard } from "./components/CostDashboard/index.jsx";
 import { ClaudeMdEditor } from "./components/ClaudeMdEditor/index.jsx";
+import { AgentRegistry } from "./components/AgentRegistry/index.jsx";
 import { useForgeStore } from "./store/index.js";
 import { useWebSocket } from "./hooks/useWebSocket.js";
 import { NotificationToast } from "./components/shared/NotificationToast.jsx";
@@ -16,6 +17,7 @@ const VIEWS = {
   sessions: SessionDashboard,
   messenger: Messenger,
   architect: AgentArchitect,
+  registry: AgentRegistry,
   context: ContextHub,
   integrations: Integrations,
   prompts: PromptLibrary,

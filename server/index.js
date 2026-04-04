@@ -15,6 +15,8 @@ import { promptsRouter } from "./routes/prompts.js";
 import { costsRouter } from "./routes/costs.js";
 import { gitRouter } from "./routes/git.js";
 import { claudemdRouter } from "./routes/claudemd.js";
+import { registryRouter } from "./routes/registry.js";
+import { workflowsRouter } from "./routes/workflows.js";
 import { getQuickActions } from "./stores/quick-actions.js";
 import { notificationsRouter } from "./routes/notifications.js";
 import { notificationStore } from "./stores/notifications.js";
@@ -45,6 +47,8 @@ app.use("/api/costs", costsRouter);
 app.use("/api/git", gitRouter);
 app.use("/api/claudemd", claudemdRouter);
 app.use("/api/notifications", notificationsRouter);
+app.use("/api/registry", registryRouter);
+app.use("/api/workflows", workflowsRouter);
 app.get("/api/quick-actions", (_, res) => res.json(getQuickActions()));
 app.get("/api/health", (_, res) => res.json({ ok: true, version: "1.0.0" }));
 
@@ -208,8 +212,10 @@ function handleClientMessage(msg, ws) {
 
 // Wire broadcast to hooks, runner, and start session watcher
 import { runManager } from "./agents/runner.js";
+import { workflowDaemon } from "./agents/workflows.js";
 setHooksBroadcast(broadcast);
 runManager.setBroadcast(broadcast);
+workflowDaemon.setBroadcast(broadcast);
 sessionWatcher.start(broadcast);
 
 server.listen(PORT, () => {
