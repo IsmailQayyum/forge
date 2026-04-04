@@ -94,6 +94,7 @@ class RunManager {
         nodeId: node.id,
         label: node.data.label,
         role: node.data.role,
+        type: node.type, // agentNode, triggerNode, actionNode
         status: "pending",
         terminalId: null,
         output: "",
@@ -128,10 +129,15 @@ class RunManager {
       })),
     });
 
-    // Start root agents (no parents)
+    // Start root nodes (no parents)
+    // Trigger/action nodes auto-complete immediately, only agentNodes spawn Claude
     const roots = nodes.filter((n) => !parentMap.has(n.id));
     for (const root of roots) {
-      this._startAgent(runId, root.id);
+      if (root.type === "triggerNode" || root.type === "actionNode") {
+        this._autoComplete(runId, root.id);
+      } else {
+        this._startAgent(runId, root.id);
+      }
     }
 
     return runId;
@@ -289,6 +295,27 @@ class RunManager {
     this._checkRunComplete(runId);
   }
 
+  /**
+   * Auto-complete trigger/action nodes — they don't run Claude,
+   * they just pass through and trigger their children.
+   */
+  _autoComplete(runId, nodeId) {
+    const run = this.runs.get(runId);
+    if (!run) return;
+
+    const agent = run.agents[nodeId];
+    agent.status = "completed";
+    agent.lastActivity = "Done";
+    agent.output = `[${agent.type || "node"}: ${agent.label}] — auto-completed`;
+
+    this._broadcast("AGENT_STATUS", {
+      runId, nodeId, status: "completed",
+    });
+
+    this._tryStartChildren(runId, nodeId);
+    this._checkRunComplete(runId);
+  }
+
   _tryStartChildren(runId, nodeId) {
     const run = this.runs.get(runId);
     if (!run) return;
@@ -300,7 +327,12 @@ class RunManager {
         (pid) => run.agents[pid]?.status === "completed"
       );
       if (allParentsDone && run.agents[childId]?.status === "pending") {
-        this._startAgent(runId, childId);
+        const child = run.agents[childId];
+        if (child.type === "triggerNode" || child.type === "actionNode") {
+          this._autoComplete(runId, childId);
+        } else {
+          this._startAgent(runId, childId);
+        }
       }
     }
   }
