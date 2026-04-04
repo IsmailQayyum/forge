@@ -4,140 +4,168 @@
       <stop offset="0%" stop-color="#18181b"/>
       <stop offset="100%" stop-color="#0e0e10"/>
     </linearGradient>
-    <linearGradient id="bodyMain" x1="200" y1="60" x2="200" y2="320">
-      <stop offset="0%" stop-color="#fde68a"/>
-      <stop offset="25%" stop-color="#f97316"/>
-      <stop offset="60%" stop-color="#ea580c"/>
-      <stop offset="100%" stop-color="#c2410c"/>
-    </linearGradient>
-    <linearGradient id="wingLeft" x1="60" y1="100" x2="180" y2="250">
-      <stop offset="0%" stop-color="#fbbf24"/>
+    <linearGradient id="fireBody" x1="200" y1="50" x2="200" y2="310">
+      <stop offset="0%" stop-color="#fef08a"/>
+      <stop offset="20%" stop-color="#fbbf24"/>
       <stop offset="50%" stop-color="#f97316"/>
+      <stop offset="80%" stop-color="#dc2626"/>
+      <stop offset="100%" stop-color="#991b1b"/>
+    </linearGradient>
+    <linearGradient id="fireWingL" x1="20" y1="50" x2="180" y2="240">
+      <stop offset="0%" stop-color="#fef08a"/>
+      <stop offset="30%" stop-color="#fbbf24"/>
+      <stop offset="60%" stop-color="#f97316"/>
       <stop offset="100%" stop-color="#dc2626"/>
     </linearGradient>
-    <linearGradient id="wingRight" x1="220" y1="100" x2="340" y2="250">
-      <stop offset="0%" stop-color="#fbbf24"/>
-      <stop offset="50%" stop-color="#f97316"/>
+    <linearGradient id="fireWingR" x1="380" y1="50" x2="220" y2="240">
+      <stop offset="0%" stop-color="#fef08a"/>
+      <stop offset="30%" stop-color="#fbbf24"/>
+      <stop offset="60%" stop-color="#f97316"/>
       <stop offset="100%" stop-color="#dc2626"/>
     </linearGradient>
-    <linearGradient id="chest" x1="200" y1="160" x2="200" y2="280">
-      <stop offset="0%" stop-color="#fef3c7"/>
+    <linearGradient id="fireChest" x1="200" y1="120" x2="200" y2="250">
+      <stop offset="0%" stop-color="#fef9c3"/>
       <stop offset="50%" stop-color="#fde68a"/>
-      <stop offset="100%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
     </linearGradient>
-    <linearGradient id="tailFlame" x1="200" y1="280" x2="200" y2="370">
-      <stop offset="0%" stop-color="#f97316"/>
-      <stop offset="40%" stop-color="#ef4444"/>
-      <stop offset="100%" stop-color="#dc2626" stop-opacity="0.3"/>
+    <linearGradient id="fireTail" x1="200" y1="260" x2="200" y2="370">
+      <stop offset="0%" stop-color="#ea580c"/>
+      <stop offset="50%" stop-color="#dc2626"/>
+      <stop offset="100%" stop-color="#7f1d1d" stop-opacity="0"/>
     </linearGradient>
-    <linearGradient id="crest" x1="200" y1="50" x2="200" y2="100">
-      <stop offset="0%" stop-color="#fef3c7"/>
-      <stop offset="100%" stop-color="#f97316"/>
+    <linearGradient id="chrome" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#d4d4d8"/>
+      <stop offset="30%" stop-color="#a1a1aa"/>
+      <stop offset="55%" stop-color="#e4e4e7"/>
+      <stop offset="80%" stop-color="#71717a"/>
+      <stop offset="100%" stop-color="#a1a1aa"/>
     </linearGradient>
-    <filter id="glow">
-      <feGaussianBlur stdDeviation="6" result="blur"/>
-      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
-    <filter id="softGlow">
-      <feGaussianBlur stdDeviation="12" result="blur"/>
-      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
+    <linearGradient id="chromeDark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#71717a"/>
+      <stop offset="40%" stop-color="#52525b"/>
+      <stop offset="60%" stop-color="#a1a1aa"/>
+      <stop offset="100%" stop-color="#3f3f46"/>
+    </linearGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="softGlow"><feGaussianBlur stdDeviation="12" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="emberGlow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
   </defs>
 
   <!-- Background -->
   <rect width="400" height="400" rx="48" fill="url(#bg)"/>
   <rect x="2" y="2" width="396" height="396" rx="46" fill="none" stroke="#27272a" stroke-width="1"/>
 
-  <!-- Ambient glow behind phoenix -->
-  <ellipse cx="200" cy="200" rx="120" ry="140" fill="#f97316" opacity="0.06" filter="url(#softGlow)"/>
+  <!-- Ambient glow -->
+  <ellipse cx="200" cy="190" rx="130" ry="150" fill="#f97316" opacity="0.06" filter="url(#softGlow)"/>
 
-  <!-- Tail flames (behind body) -->
-  <path d="M180 280 C170 310, 155 340, 140 365 C150 350, 165 330, 175 300 C168 325, 155 355, 148 370 C160 350, 172 320, 180 290Z" fill="url(#tailFlame)" opacity="0.7" filter="url(#glow)"/>
-  <path d="M200 285 C200 315, 195 345, 190 370 C198 350, 202 325, 200 300 C205 330, 208 355, 210 370 C205 345, 200 315, 200 290Z" fill="url(#tailFlame)" opacity="0.8" filter="url(#glow)"/>
-  <path d="M220 280 C230 310, 245 340, 260 365 C250 350, 235 330, 225 300 C232 325, 245 355, 252 370 C240 350, 228 320, 220 290Z" fill="url(#tailFlame)" opacity="0.7" filter="url(#glow)"/>
+  <!-- === TAIL — flame dagger === -->
+  <path d="M185 265 C175 295, 160 325, 148 348 C142 358, 135 365, 130 370 C140 352, 155 328, 165 305 L182 272Z" fill="url(#fireTail)" opacity="0.6" filter="url(#glow)"/>
+  <path d="M195 268 C193 300, 188 332, 182 355 C180 365, 176 372, 172 378 C178 360, 185 335, 190 308 L194 274Z" fill="url(#fireTail)" opacity="0.7" filter="url(#glow)"/>
+  <path d="M200 270 C200 305, 200 340, 200 368 C200 375, 200 380, 200 385 C200 375, 200 342, 200 308Z" fill="url(#fireTail)" opacity="0.85" filter="url(#glow)"/>
+  <path d="M205 268 C207 300, 212 332, 218 355 C220 365, 224 372, 228 378 C222 360, 215 335, 210 308 L206 274Z" fill="url(#fireTail)" opacity="0.7" filter="url(#glow)"/>
+  <path d="M215 265 C225 295, 240 325, 252 348 C258 358, 265 365, 270 370 C260 352, 245 328, 235 305 L218 272Z" fill="url(#fireTail)" opacity="0.6" filter="url(#glow)"/>
 
-  <!-- Left wing (behind) -->
-  <path d="M170 160
-    C140 130, 80 100, 45 75
-    C55 95, 75 115, 95 135
-    C70 125, 40 110, 28 95
-    C40 120, 65 140, 90 155
-    C65 148, 38 138, 25 125
-    C42 148, 70 162, 100 170
-    C80 172, 55 168, 35 158
-    C55 175, 85 185, 115 185
-    C100 192, 82 195, 65 190
-    C85 200, 108 205, 135 200
-    C128 210, 140 230, 155 250
-    C150 225, 155 195, 170 160Z"
-    fill="url(#wingLeft)" opacity="0.9"/>
+  <!-- === LEFT WING — swept dramatically upward === -->
+  <!-- Chrome outer edge -->
+  <path d="M165 158 C138 118, 90 68, 48 28 C40 20, 32 14, 25 8
+           C35 18, 50 38, 65 58
+           C42 42, 22 22, 8 10
+           C22 30, 45 55, 68 78
+           C48 65, 28 48, 12 32
+           C30 52, 55 75, 82 95
+           L158 158Z"
+    fill="url(#chromeDark)" opacity="0.65"/>
+  <!-- Fire fill -->
+  <path d="M162 162 C140 125, 95 78, 55 38
+           C68 52, 82 72, 95 90
+           C72 75, 48 55, 32 40
+           C50 60, 72 82, 98 100
+           C78 90, 55 75, 38 62
+           C58 80, 82 98, 108 112
+           C90 108, 68 100, 50 90
+           C68 105, 95 118, 125 128
+           L158 162Z"
+    fill="url(#fireWingL)" opacity="0.9"/>
+  <!-- Chrome leading edge highlight -->
+  <path d="M165 158 C135 115, 88 65, 48 28" stroke="url(#chrome)" stroke-width="2.5" fill="none" opacity="0.55"/>
+  <path d="M48 28 C38 18, 32 12, 25 8" stroke="#e4e4e7" stroke-width="1.5" fill="none" opacity="0.4"/>
 
-  <!-- Right wing (behind) -->
-  <path d="M230 160
-    C260 130, 320 100, 355 75
-    C345 95, 325 115, 305 135
-    C330 125, 360 110, 372 95
-    C360 120, 335 140, 310 155
-    C335 148, 362 138, 375 125
-    C358 148, 330 162, 300 170
-    C320 172, 345 168, 365 158
-    C345 175, 315 185, 285 185
-    C300 192, 318 195, 335 190
-    C315 200, 292 205, 265 200
-    C272 210, 260 230, 245 250
-    C250 225, 245 195, 230 160Z"
-    fill="url(#wingRight)" opacity="0.9"/>
+  <!-- === RIGHT WING — mirror === -->
+  <!-- Chrome outer edge -->
+  <path d="M235 158 C262 118, 310 68, 352 28 C360 20, 368 14, 375 8
+           C365 18, 350 38, 335 58
+           C358 42, 378 22, 392 10
+           C378 30, 355 55, 332 78
+           C352 65, 372 48, 388 32
+           C370 52, 345 75, 318 95
+           L242 158Z"
+    fill="url(#chromeDark)" opacity="0.65"/>
+  <!-- Fire fill -->
+  <path d="M238 162 C260 125, 305 78, 345 38
+           C332 52, 318 72, 305 90
+           C328 75, 352 55, 368 40
+           C350 60, 328 82, 302 100
+           C322 90, 345 75, 362 62
+           C342 80, 318 98, 292 112
+           C310 108, 332 100, 350 90
+           C332 105, 305 118, 275 128
+           L242 162Z"
+    fill="url(#fireWingR)" opacity="0.9"/>
+  <!-- Chrome leading edge highlight -->
+  <path d="M235 158 C265 115, 312 65, 352 28" stroke="url(#chrome)" stroke-width="2.5" fill="none" opacity="0.55"/>
+  <path d="M352 28 C362 18, 368 12, 375 8" stroke="#e4e4e7" stroke-width="1.5" fill="none" opacity="0.4"/>
 
-  <!-- Body -->
-  <path d="M200 95
-    C220 105, 240 130, 242 160
-    C244 185, 238 210, 232 235
-    C226 255, 215 270, 200 280
-    C185 270, 174 255, 168 235
-    C162 210, 156 185, 158 160
-    C160 130, 180 105, 200 95Z"
-    fill="url(#bodyMain)"/>
+  <!-- === BODY === -->
+  <path d="M200 88 C218 98, 236 120, 238 148 C240 172, 235 198, 228 222 C222 240, 212 254, 200 264 C188 254, 178 240, 172 222 C165 198, 160 172, 162 148 C164 120, 182 98, 200 88Z"
+    fill="url(#fireBody)"/>
+  <!-- Chrome body outline -->
+  <path d="M200 88 C218 98, 236 120, 238 148 C240 172, 235 198, 228 222 C222 240, 212 254, 200 264 C188 254, 178 240, 172 222 C165 198, 160 172, 162 148 C164 120, 182 98, 200 88Z"
+    fill="none" stroke="url(#chromeDark)" stroke-width="1.5" opacity="0.3"/>
 
-  <!-- Chest/belly -->
-  <path d="M200 140
-    C215 148, 225 165, 226 185
-    C227 205, 222 225, 215 245
-    C210 258, 205 262, 200 265
-    C195 262, 190 258, 185 245
-    C178 225, 173 205, 174 185
-    C175 165, 185 148, 200 140Z"
-    fill="url(#chest)" opacity="0.85"/>
+  <!-- Chest -->
+  <path d="M200 125 C212 132, 222 148, 222 168 C222 186, 218 204, 212 220 C208 228, 204 234, 200 238 C196 234, 192 228, 188 220 C182 204, 178 186, 178 168 C178 148, 188 132, 200 125Z"
+    fill="url(#fireChest)" opacity="0.85"/>
+  <!-- Feather scale lines -->
+  <path d="M182 162 Q200 168 218 162" stroke="#f59e0b" stroke-width="0.5" fill="none" opacity="0.35"/>
+  <path d="M180 178 Q200 185 220 178" stroke="#f59e0b" stroke-width="0.5" fill="none" opacity="0.3"/>
+  <path d="M182 194 Q200 200 218 194" stroke="#f59e0b" stroke-width="0.45" fill="none" opacity="0.25"/>
+  <path d="M184 208 Q200 214 216 208" stroke="#f59e0b" stroke-width="0.4" fill="none" opacity="0.2"/>
 
   <!-- Head -->
-  <ellipse cx="200" cy="105" rx="24" ry="22" fill="#f97316"/>
-  <ellipse cx="200" cy="108" rx="18" ry="16" fill="#fb923c" opacity="0.6"/>
+  <ellipse cx="200" cy="98" rx="22" ry="20" fill="#f97316"/>
+  <ellipse cx="200" cy="100" rx="16" ry="14" fill="#fb923c" opacity="0.5"/>
+  <ellipse cx="200" cy="98" rx="22" ry="20" fill="none" stroke="url(#chromeDark)" stroke-width="1.2" opacity="0.25"/>
 
-  <!-- Head crest feathers -->
-  <path d="M200 85 C198 65, 188 48, 180 38 C190 52, 195 68, 197 82Z" fill="url(#crest)" filter="url(#glow)"/>
-  <path d="M200 85 C202 60, 200 42, 200 30 C200 45, 200 65, 200 82Z" fill="url(#crest)" filter="url(#glow)"/>
-  <path d="M200 85 C202 65, 212 48, 220 38 C210 52, 205 68, 203 82Z" fill="url(#crest)" filter="url(#glow)"/>
+  <!-- Crest plumes — swept back -->
+  <path d="M200 80 C197 58, 185 32, 175 15 C185 30, 194 52, 197 72Z" fill="#fde68a" filter="url(#glow)" opacity="0.8"/>
+  <path d="M200 80 C200 52, 200 25, 200 5 C200 28, 200 55, 200 72Z" fill="#fef08a" filter="url(#glow)" opacity="0.9"/>
+  <path d="M200 80 C203 58, 215 32, 225 15 C215 30, 206 52, 203 72Z" fill="#fde68a" filter="url(#glow)" opacity="0.8"/>
+  <!-- Chrome crest tips -->
+  <path d="M175 15 C172 10, 170 6, 168 2" stroke="#a1a1aa" stroke-width="1" fill="none" opacity="0.45"/>
+  <path d="M200 5 C200 2, 200 0, 200 -2" stroke="#d4d4d8" stroke-width="1" fill="none" opacity="0.5"/>
+  <path d="M225 15 C228 10, 230 6, 232 2" stroke="#a1a1aa" stroke-width="1" fill="none" opacity="0.45"/>
 
-  <!-- Eyes -->
-  <ellipse cx="190" cy="102" rx="4.5" ry="5" fill="#0e0e10"/>
-  <ellipse cx="210" cy="102" rx="4.5" ry="5" fill="#0e0e10"/>
-  <ellipse cx="191" cy="100.5" rx="2" ry="2.2" fill="#fef3c7" opacity="0.9"/>
-  <ellipse cx="211" cy="100.5" rx="2" ry="2.2" fill="#fef3c7" opacity="0.9"/>
+  <!-- Eyes — fierce -->
+  <ellipse cx="190" cy="95" rx="4.5" ry="5" fill="#0e0e10"/>
+  <ellipse cx="210" cy="95" rx="4.5" ry="5" fill="#0e0e10"/>
+  <ellipse cx="190" cy="95" rx="2.5" ry="2.8" fill="#991b1b" opacity="0.5"/>
+  <ellipse cx="210" cy="95" rx="2.5" ry="2.8" fill="#991b1b" opacity="0.5"/>
+  <ellipse cx="191" cy="93.5" rx="1.5" ry="1.8" fill="#fef9c3" opacity="0.95"/>
+  <ellipse cx="211" cy="93.5" rx="1.5" ry="1.8" fill="#fef9c3" opacity="0.95"/>
 
   <!-- Beak -->
-  <path d="M196 110 L200 120 L204 110 Z" fill="#c2410c"/>
-  <path d="M196 110 L200 115 L204 110 Z" fill="#ea580c"/>
+  <path d="M196 105 L200 115 L204 105Z" fill="#991b1b"/>
+  <path d="M197 105 L200 112 L203 105Z" fill="#c2410c" opacity="0.5"/>
 
-  <!-- Wing edge highlights -->
-  <path d="M45 75 C55 93, 73 112, 93 132" stroke="#fde68a" stroke-width="1" opacity="0.4" fill="none"/>
-  <path d="M355 75 C345 93, 327 112, 307 132" stroke="#fde68a" stroke-width="1" opacity="0.4" fill="none"/>
-
-  <!-- Floating embers -->
-  <circle cx="80" cy="85" r="2.5" fill="#fbbf24" opacity="0.6" filter="url(#glow)"/>
-  <circle cx="320" cy="90" r="2" fill="#fde68a" opacity="0.5" filter="url(#glow)"/>
-  <circle cx="110" cy="65" r="1.5" fill="#fef3c7" opacity="0.5"/>
-  <circle cx="290" cy="68" r="1.8" fill="#fbbf24" opacity="0.4"/>
-  <circle cx="150" cy="55" r="1.2" fill="#fde68a" opacity="0.4"/>
-  <circle cx="255" cy="52" r="1.5" fill="#fef3c7" opacity="0.35"/>
+  <!-- Embers -->
+  <circle cx="70" cy="60" r="3" fill="#fbbf24" opacity="0.55" filter="url(#emberGlow)"/>
+  <circle cx="330" cy="65" r="2.5" fill="#fde68a" opacity="0.5" filter="url(#emberGlow)"/>
+  <circle cx="105" cy="38" r="2" fill="#fef9c3" opacity="0.45" filter="url(#emberGlow)"/>
+  <circle cx="298" cy="42" r="2.2" fill="#fbbf24" opacity="0.38" filter="url(#emberGlow)"/>
+  <circle cx="42" cy="88" r="1.5" fill="#fde68a" opacity="0.3" filter="url(#emberGlow)"/>
+  <circle cx="358" cy="92" r="1.6" fill="#fde68a" opacity="0.28" filter="url(#emberGlow)"/>
+  <circle cx="140" cy="22" r="1.3" fill="#fef9c3" opacity="0.4" filter="url(#emberGlow)"/>
+  <circle cx="262" cy="25" r="1.5" fill="#fef9c3" opacity="0.35" filter="url(#emberGlow)"/>
 
   <!-- FORGE text -->
   <text x="200" y="365" text-anchor="middle" fill="#52525b" font-family="'SF Mono', 'Fira Code', monospace" font-size="18" font-weight="700" letter-spacing="8">FORGE</text>
