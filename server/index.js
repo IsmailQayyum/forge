@@ -17,6 +17,7 @@ import { gitRouter } from "./routes/git.js";
 import { claudemdRouter } from "./routes/claudemd.js";
 import { registryRouter } from "./routes/registry.js";
 import { workflowsRouter } from "./routes/workflows.js";
+import { integrationStore } from "./stores/integrations.js";
 import { getQuickActions } from "./stores/quick-actions.js";
 import { notificationsRouter } from "./routes/notifications.js";
 import { notificationStore } from "./stores/notifications.js";
@@ -157,13 +158,20 @@ export function broadcast(type, payload) {
 // WebSocket connection
 wss.on("connection", (ws) => {
   // Send current state on connect
+  const initPayload = {
+    sessions: sessionWatcher.getSessions(),
+    agents: agentStore.getAll(),
+    terminals: getTerminals(),
+  };
+
+  // Add integration status from persisted tokens
+  try {
+    initPayload.integrations = integrationStore.getAll();
+  } catch {}
+
   ws.send(JSON.stringify({
     type: "INIT",
-    payload: {
-      sessions: sessionWatcher.getSessions(),
-      agents: agentStore.getAll(),
-      terminals: getTerminals(),
-    },
+    payload: initPayload,
     ts: Date.now(),
   }));
 

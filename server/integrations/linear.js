@@ -1,11 +1,28 @@
 import { LinearClient } from "@linear/sdk";
+import { integrationStore } from "../stores/integrations.js";
 
 let client = null;
+
+// Auto-reconnect from stored credentials on import
+try {
+  const stored = integrationStore.getCredential("linear");
+  if (stored?.token_raw) {
+    client = new LinearClient({ apiKey: stored.token_raw });
+  }
+} catch {}
 
 export const linearClient = {
   async connect(apiKey) {
     client = new LinearClient({ apiKey });
-    return this.getViewer();
+    const viewer = await this.getViewer();
+    // Persist on successful connection
+    integrationStore.saveCredential("linear", apiKey, { user: viewer.name });
+    return viewer;
+  },
+
+  disconnect() {
+    client = null;
+    integrationStore.removeCredential("linear");
   },
 
   async getViewer() {

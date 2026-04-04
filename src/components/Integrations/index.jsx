@@ -7,6 +7,21 @@ export function Integrations() {
   const integrations = useForgeStore((s) => s.integrations);
   const setIntegration = useForgeStore((s) => s.setIntegration);
 
+  // Check integration status on mount (auto-reconnect from stored tokens)
+  useEffect(() => {
+    fetch("/api/integrations/status")
+      .then((r) => r.json())
+      .then((status) => {
+        if (status.github?.connected) {
+          setIntegration("github", { connected: true, user: status.github.user });
+        }
+        if (status.linear?.connected) {
+          setIntegration("linear", { connected: true, user: status.linear.user });
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   return (
     <div className="flex flex-col h-full">
       <div className="px-6 py-4 border-b border-forge-border flex items-center gap-2">
@@ -225,7 +240,18 @@ function GitHubCard({ state, onUpdate }) {
   return (
     <IntegrationCard icon={<Github size={18} className="text-forge-text" />} name="GitHub" description="Browse issues, PRs, inject as context" connected={state.connected}>
       {state.connected ? (
-        <p className="text-xs text-forge-muted">Signed in as <span className="text-forge-text">{state.user}</span></p>
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-forge-muted">Signed in as <span className="text-forge-text font-semibold">{state.user}</span></p>
+          <button
+            onClick={async () => {
+              await fetch("/api/integrations/github/disconnect", { method: "POST" });
+              onUpdate({ connected: false, token: null, user: null });
+            }}
+            className="text-[10px] text-forge-muted hover:text-forge-red transition-colors"
+          >
+            Disconnect
+          </button>
+        </div>
       ) : (
         <div className="flex flex-col gap-2">
           <input type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder="GitHub personal access token"
@@ -261,7 +287,18 @@ function LinearCard({ state, onUpdate }) {
   return (
     <IntegrationCard icon={<span className="text-purple-400 font-bold text-sm">L</span>} name="Linear" description="Fetch tickets, inject as context" connected={state.connected}>
       {state.connected ? (
-        <p className="text-xs text-forge-muted">Signed in as <span className="text-forge-text">{state.user}</span></p>
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-forge-muted">Signed in as <span className="text-forge-text font-semibold">{state.user}</span></p>
+          <button
+            onClick={async () => {
+              await fetch("/api/integrations/linear/disconnect", { method: "POST" });
+              onUpdate({ connected: false, apiKey: null, user: null });
+            }}
+            className="text-[10px] text-forge-muted hover:text-forge-red transition-colors"
+          >
+            Disconnect
+          </button>
+        </div>
       ) : (
         <div className="flex flex-col gap-2">
           <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="Linear API key"

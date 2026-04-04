@@ -1,11 +1,29 @@
 import { Octokit } from "@octokit/rest";
+import { integrationStore } from "../stores/integrations.js";
 
 let octokit = null;
+
+// Auto-reconnect from stored credentials on import
+try {
+  const stored = integrationStore.getCredential("github");
+  if (stored?.token_raw) {
+    octokit = new Octokit({ auth: stored.token_raw });
+  }
+} catch {}
 
 export const githubClient = {
   connect(token) {
     octokit = new Octokit({ auth: token });
-    return this.getUser();
+    return this.getUser().then((user) => {
+      // Persist token on successful connection
+      integrationStore.saveCredential("github", token, { user: user.login });
+      return user;
+    });
+  },
+
+  disconnect() {
+    octokit = null;
+    integrationStore.removeCredential("github");
   },
 
   async getUser() {
