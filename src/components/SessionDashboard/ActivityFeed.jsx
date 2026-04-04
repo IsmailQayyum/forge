@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from "react";
 import { FileText, Terminal, Search, Edit, Users, Zap } from "lucide-react";
 import clsx from "clsx";
 import { TokenBurnRate } from "./TokenBurnRate.jsx";
+import { DiffViewer } from "./DiffViewer.jsx";
 
 const TOOL_ICONS = {
   Read: FileText,
@@ -97,6 +98,9 @@ export function ActivityFeed({ session }) {
           </div>
         </div>
       )}
+
+      {/* Diff viewer */}
+      {session.cwd && <DiffViewer cwd={session.cwd} />}
 
       {/* Feed */}
       <div className="flex-1 overflow-y-auto px-4 py-2">

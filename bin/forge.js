@@ -1,16 +1,17 @@
 #!/usr/bin/env node
 import { program } from "commander";
-import open from "open";
 import chalk from "chalk";
+import ora from "ora";
 import { createRequire } from "module";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
-import { spawn } from "child_process";
-import { installCommand, uninstallCommand } from "../src/cli/install.js";
+import { spawn, execSync } from "child_process";
+import { existsSync } from "fs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const projectRoot = join(__dirname, "..");
 const require = createRequire(import.meta.url);
-const pkg = require(join(__dirname, "../package.json"));
+const pkg = require(join(projectRoot, "package.json"));
 
 const PORT = process.env.FORGE_PORT || 3333;
 
@@ -21,36 +22,56 @@ program
 
 program
   .command("start", { isDefault: true })
-  .description("Start the Forge server and open the UI")
-  .option("-p, --port <port>", "Port to run on", "3333")
-  .option("--no-open", "Don't auto-open the browser")
+  .description("Start the Forge server (builds if needed, then serves)")
+  .option("-p, --port <port>", "Port to run on", String(PORT))
   .action(async (options) => {
-    console.log();
-    console.log(chalk.bold("  🔥 Forge"));
-    console.log(chalk.dim(`  Local agent orchestration for Claude Code\n`));
+    const port = options.port;
+    const distPath = join(projectRoot, "dist");
 
-    const serverPath = join(__dirname, "../server/index.js");
-    const env = { ...process.env, FORGE_PORT: options.port, NODE_ENV: "production" };
+    // Build if dist/ doesn't exist
+    if (!existsSync(distPath)) {
+      const spinner = ora({
+        text: chalk.dim("Building Forge..."),
+        color: "yellow",
+      }).start();
+
+      try {
+        execSync("npx vite build", {
+          cwd: projectRoot,
+          stdio: "pipe",
+        });
+        spinner.succeed(chalk.dim("Build complete"));
+      } catch (err) {
+        spinner.fail(chalk.red("Build failed"));
+        console.error(err.stderr?.toString() || err.message);
+        process.exit(1);
+      }
+    }
+
+    // Start the server
+    const serverPath = join(projectRoot, "server/index.js");
+    const env = { ...process.env, FORGE_PORT: port, NODE_ENV: "production" };
 
     const server = spawn("node", [serverPath, "--serve"], {
       env,
       stdio: "inherit",
+      cwd: projectRoot,
     });
 
     server.on("error", (err) => {
-      console.error(chalk.red(`  Failed to start server: ${err.message}`));
+      console.error(chalk.red(`Failed to start server: ${err.message}`));
       process.exit(1);
     });
 
-    // Give server a moment to start
+    // Give server a moment to start, then print the banner
     setTimeout(() => {
-      const url = `http://localhost:${options.port}`;
-      console.log(chalk.green(`  ✓ Running at ${chalk.bold(url)}`));
-      console.log(chalk.dim("  Press Ctrl+C to stop\n"));
-
-      if (options.open !== false) {
-        open(url);
-      }
+      console.log();
+      console.log(chalk.bold("  🔥 Forge is running"));
+      console.log();
+      console.log(`     Local:  ${chalk.cyan(`http://localhost:${port}`)}`);
+      console.log();
+      console.log(chalk.dim("     Press Ctrl+C to stop"));
+      console.log();
     }, 800);
 
     process.on("SIGINT", () => {
@@ -60,15 +81,63 @@ program
   });
 
 program
-  .command("install")
-  .description("Install Forge bridge hooks into Claude Code")
-  .option("-g, --global", "Install into ~/.claude/settings.json (all projects)")
-  .action(installCommand);
+  .command("dev")
+  .description("Start in dev mode (server + vite concurrently)")
+  .option("-p, --port <port>", "Port to run on", String(PORT))
+  .action(async (options) => {
+    const port = options.port;
 
-program
-  .command("uninstall")
-  .description("Remove Forge bridge hooks from Claude Code")
-  .option("-g, --global", "Remove from ~/.claude/settings.json")
-  .action(uninstallCommand);
+    console.log();
+    console.log(chalk.bold("  🔥 Forge") + chalk.dim(" (dev mode)"));
+    console.log();
+
+    const env = { ...process.env, FORGE_PORT: port };
+
+    const child = spawn(
+      "npx",
+      ["concurrently", "--kill-others", `"node server/index.js"`, `"vite"`],
+      {
+        env,
+        stdio: "inherit",
+        cwd: projectRoot,
+        shell: true,
+      }
+    );
+
+    child.on("error", (err) => {
+      console.error(chalk.red(`Failed to start dev server: ${err.message}`));
+      process.exit(1);
+    });
+
+    child.on("exit", (code) => {
+      process.exit(code ?? 0);
+    });
+
+    process.on("SIGINT", () => {
+      child.kill();
+      process.exit(0);
+    });
+  });
+
+// Preserve existing install/uninstall commands if the module exists
+try {
+  const { installCommand, uninstallCommand } = await import(
+    "../src/cli/install.js"
+  );
+
+  program
+    .command("install")
+    .description("Install Forge bridge hooks into Claude Code")
+    .option("-g, --global", "Install into ~/.claude/settings.json (all projects)")
+    .action(installCommand);
+
+  program
+    .command("uninstall")
+    .description("Remove Forge bridge hooks from Claude Code")
+    .option("-g, --global", "Remove from ~/.claude/settings.json")
+    .action(uninstallCommand);
+} catch {
+  // install/uninstall commands not available
+}
 
 program.parse();

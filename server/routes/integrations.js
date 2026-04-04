@@ -1,20 +1,56 @@
 import { Router } from "express";
 import { githubClient } from "../integrations/github.js";
 import { linearClient } from "../integrations/linear.js";
+import { integrationStore } from "../stores/integrations.js";
 
 export const integrationsRouter = Router();
+
+// ── Status (all integrations) ──
+integrationsRouter.get("/status", async (req, res) => {
+  const status = {};
+
+  // GitHub
+  if (githubClient.isConnected()) {
+    try {
+      const user = await githubClient.getUser();
+      status.github = { connected: true, user: user.login };
+    } catch {
+      status.github = { connected: false };
+    }
+  } else {
+    status.github = { connected: false };
+  }
+
+  // Linear
+  if (linearClient.isConnected()) {
+    try {
+      const viewer = await linearClient.getViewer();
+      status.linear = { connected: true, user: viewer.name };
+    } catch {
+      status.linear = { connected: false };
+    }
+  } else {
+    status.linear = { connected: false };
+  }
+
+  res.json(status);
+});
 
 // ── GitHub ─────────────────────────────────────────────────────────────────
 
 integrationsRouter.post("/github/connect", async (req, res) => {
   try {
     const { token } = req.body;
-    await githubClient.connect(token);
-    const user = await githubClient.getUser();
+    const user = await githubClient.connect(token);
     res.json({ ok: true, user: user.login });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+});
+
+integrationsRouter.post("/github/disconnect", (req, res) => {
+  githubClient.disconnect();
+  res.json({ ok: true });
 });
 
 integrationsRouter.get("/github/repos", async (req, res) => {
@@ -61,12 +97,16 @@ integrationsRouter.get("/github/issues/:owner/:repo/:number/content", async (req
 integrationsRouter.post("/linear/connect", async (req, res) => {
   try {
     const { apiKey } = req.body;
-    await linearClient.connect(apiKey);
-    const viewer = await linearClient.getViewer();
+    const viewer = await linearClient.connect(apiKey);
     res.json({ ok: true, user: viewer.name });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+});
+
+integrationsRouter.post("/linear/disconnect", (req, res) => {
+  linearClient.disconnect();
+  res.json({ ok: true });
 });
 
 integrationsRouter.get("/linear/issues", async (req, res) => {

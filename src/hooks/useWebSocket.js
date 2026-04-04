@@ -16,6 +16,7 @@ export function useWebSocket() {
     ws.onopen = () => {
       console.log("Forge connected");
       window.__forgeWs = ws;
+      useForgeStore.getState().setConnected(true);
       if (reconnectRef.current) {
         clearTimeout(reconnectRef.current);
         reconnectRef.current = null;
@@ -30,6 +31,7 @@ export function useWebSocket() {
     };
 
     ws.onclose = () => {
+      useForgeStore.getState().setConnected(false);
       reconnectRef.current = setTimeout(connect, 2000);
     };
 
@@ -52,7 +54,7 @@ export function useWebSocket() {
 function handleMessage(msg, store) {
   switch (msg.type) {
     case "INIT": {
-      const { sessions = [], agents } = msg.payload;
+      const { sessions = [], agents, integrations } = msg.payload;
       for (const s of sessions) {
         store.addSession(s);
         // Build initial event stream from existing messages + tool calls
@@ -73,6 +75,14 @@ function handleMessage(msg, store) {
       if (agents?.architectures) {
         store.setArchitectures(agents.architectures);
         store.setActiveArch(agents.active);
+      }
+      // Restore integration connection status from persisted tokens
+      if (integrations) {
+        for (const [name, status] of Object.entries(integrations)) {
+          if (status.connected) {
+            store.setIntegration(name, { connected: true, user: status.user });
+          }
+        }
       }
       break;
     }

@@ -1,6 +1,10 @@
 import { create } from "zustand";
 
 export const useForgeStore = create((set, get) => ({
+  // Connection status
+  connected: false,
+  setConnected: (val) => set({ connected: val }),
+
   // Sessions
   sessions: {},
   addSession: (session) =>

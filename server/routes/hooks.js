@@ -2,6 +2,7 @@ import { Router } from "express";
 import fs from "fs";
 import path from "path";
 import os from "os";
+import { notificationStore } from "../stores/notifications.js";
 
 const FORGE_INPUT_DIR = path.join(os.homedir(), ".claude", "forge", "inputs");
 
@@ -49,6 +50,14 @@ hooksRouter.post("/", (req, res) => {
           status: "done",
           project,
         });
+        // Fire webhook notification
+        notificationStore.notify({
+          type: "session_end",
+          title: "Session Completed",
+          message: `Claude Code session finished in ${project}`,
+          project,
+          sessionId,
+        });
         break;
     }
   }
@@ -83,6 +92,15 @@ hooksRouter.post("/permission", (req, res) => {
       ts: Date.now(),
     });
   }
+
+  // Fire webhook
+  notificationStore.notify({
+    type: "permission_needed",
+    title: "Permission Required",
+    message: `${tool} needs approval in ${project}`,
+    project,
+    sessionId,
+  });
 
   res.json({ ok: true, permissionId });
 });

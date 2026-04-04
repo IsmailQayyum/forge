@@ -1,115 +1,244 @@
-# Forge
+<p align="center">
+  <img src=".github/banner.svg" alt="Forge Banner" width="100%" />
+</p>
 
-Local agent orchestration platform for Claude Code. See everything your agents are doing, chat with them when they need input, design multi-agent architectures with CLAUDE.md export, and inject context from GitHub, Linear, Excel, and more — all from one UI.
+<p align="center">
+  <img src="https://img.shields.io/badge/build-passing-22c55e?style=flat-square&logo=github" alt="Build" />
+  <img src="https://img.shields.io/badge/release-v1.0.0-f97316?style=flat-square" alt="Release" />
+  <img src="https://img.shields.io/badge/node-%3E%3D18-3b82f6?style=flat-square&logo=node.js&logoColor=white" alt="Node" />
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux-a855f7?style=flat-square" alt="Platform" />
+  <img src="https://img.shields.io/badge/license-MIT-71717a?style=flat-square" alt="License" />
+</p>
 
-```bash
-npx forge
-```
+<p align="center">
+  <strong>The operating system for Claude Code.</strong>
+</p>
 
-Opens at `http://localhost:3333`.
+<p align="center">
+  Claude Code is the most powerful coding agent in the world. But it runs in a terminal.<br/>
+  No visibility. No control. No orchestration. You're flying blind at $75/M output tokens.<br/><br/>
+  <strong>Forge changes that.</strong> It's a local-first control plane that sits on top of Claude Code<br/>
+  and gives you the infrastructure to run AI-powered development at scale — from one interface.
+</p>
 
----
-
-## Features
-
-### Session Dashboard — Live monitoring
-Every active Claude Code session shows up as a live card with status (active/done/error). Click into any session to see a real-time feed of every tool call, file read, and command run. Sub-agents appear as tags when Claude spawns them.
-
-**Token burn rate** — see total tokens, input/output breakdown, cache hit rate, burn rate (tokens/min), estimated cost, and time-until-budget projection per session.
-
-### Messenger — Talk to your agents
-Each session is a conversation thread. When an agent is blocked waiting for your input, you get an OS-level notification and the thread highlights. Reply inline — your response routes back to the agent via the hook bridge.
-
-### Agent Architect — Design + export multi-agent systems
-Visual drag-and-drop canvas (React Flow) to define your agent hierarchy. Set supervisors, spawn workers, connect them. Per-agent capability toggles define what each agent is allowed to do: read files, push GitHub PRs, read Linear tickets, send Slack messages, etc.
-
-**Export CLAUDE.md** — one click generates a CLAUDE.md file from your architecture with agent hierarchy, allowed capabilities, restrictions, and workflow rules that Claude Code follows.
-
-### Context Hub — Inject anything
-Drag and drop Excel sheets, CSVs, PDFs, or code files — Forge parses them and makes them ready to inject into any session. Connect GitHub to browse issues and PRs. Connect Linear to pull in tickets.
-
-### Integrations
-- **GitHub** — browse repos, issues, PRs, inject as context
-- **Linear** — fetch tickets, inject as context
-- **Slack** — notifications when agents need input
+<p align="center">
+  <a href="#-get-started">Get Started</a> ·
+  <a href="#-why-forge">Why Forge</a> ·
+  <a href="#-what-you-get">What You Get</a> ·
+  <a href="#-how-it-works">How It Works</a> ·
+  <a href="#-roadmap">Roadmap</a>
+</p>
 
 ---
 
-## Setup
+## 🔥 Why Forge
+
+Claude Code is incredible. But using it professionally means:
+
+- **You can't see what it's doing** across multiple sessions. You switch terminals, lose context, miss things.
+- **You can't control costs.** One runaway session burns $50 before you notice. Multiply that across a team.
+- **You can't orchestrate.** Running Frontend + Backend + Tests agents in parallel? Copy-paste prompts across terminals. Manually.
+- **You can't approve safely.** Permission prompts interrupt your flow. You either auto-approve everything (dangerous) or babysit every tool call.
+- **You can't learn from history.** What worked? What failed? What cost the most? There's no record.
+
+Forge solves all of this. It hooks directly into Claude Code's internals — session logs, tool calls, the hook system — and gives you a real-time control plane with full visibility, cost tracking, permission management, and multi-session orchestration.
+
+**No cloud. No accounts. No API keys to Forge. Everything runs on your machine.**
+
+---
+
+## 🚀 Get Started
 
 ```bash
-# Run directly
-npx forge
-
-# Or install globally
-npm install -g forge
-forge
+git clone https://github.com/IsmailQayyum/forge.git
+cd forge && npm install
+npx vite build
+node server/index.js --serve
 ```
 
-### Connect to Claude Code
+Then connect your Claude Code:
 
 ```bash
-forge install        # installs hooks into .claude/settings.json (current project)
-forge install -g     # install globally (~/.claude/settings.json)
+node src/cli/install.js       # project hooks
+node src/cli/install.js -g    # global hooks
 ```
 
-This installs the hook bridge — a lightweight Python script that:
-- Sends tool call events to Forge in real-time (PostToolUse)
-- Checks for pending messages before each tool use (PreToolUse)
-- Forwards notifications (Notification)
-- Reports session end events (Stop)
+Open **http://localhost:3333**. That's it.
 
-To remove:
-```bash
-forge uninstall
-forge uninstall -g
+---
+
+## ⚡ What You Get
+
+### Parallel Session Orchestration
+
+Run multiple Claude Code sessions side-by-side. Frontend agent fixing CSS while Backend agent writes API endpoints while Test agent generates coverage — all visible on one screen.
+
+- **Tab-based sessions** — spawn, switch, rename, kill. Like browser tabs for Claude.
+- **Split-screen grid** — 2x2, 3x2, or any layout. All terminals live and interactive.
+- **Project auto-detection** — Forge scans your filesystem for `.git` and `CLAUDE.md` projects. Click to launch.
+- **Full PTY terminal** — not a simulation. Real xterm.js backed by node-pty. Every Claude feature works.
+
+### Visual Agent Workflows
+
+Design multi-agent systems visually. Like n8n for AI agents. Drag agents onto a canvas, connect them with triggers and actions, define roles and capabilities, then execute — Forge handles the orchestration.
+
+- **Visual canvas** — React Flow powered. Supervisors, workers, reviewers, delegation chains.
+- **Capability controls** — per-agent: what tools they can use, what files they can touch.
+- **One-click execution** — run the entire pipeline. Agents execute in topological order with output passed downstream.
+- **Live activity bubbles** — see what each agent is doing in real-time, right on the canvas nodes.
+- **Run summary** — when a pipeline completes, get an overlay with agent results, duration, and exportable reports.
+- **Git diff tracking** — Forge captures HEAD before and after a run so you can see exactly what changed.
+- **Pre-built templates** — Full-Stack Sprint, PR Review Pipeline, Bug Hunt, Deploy Pipeline.
+- **One-click CLAUDE.md export** — your architecture becomes executable instructions.
+
+### Real-Time Cost Intelligence
+
+Every token is tracked. Every dollar is accounted for.
+
+- **Live burn rate** — tokens/min, projected cost, cache hit ratio per session
+- **Budget controls** — daily limits with visual progress. Know when you're approaching the edge.
+- **Per-project breakdown** — which codebases are eating your budget. 30-day trend chart.
+- **Historical tracking** — today, this week, this month, all time. Exportable.
+- **Auto-recording** — costs tracked automatically from session token usage events.
+
+### Visual Permission Control
+
+Claude Code's permission system is powerful but invisible. Forge makes it visual.
+
+- **Allow / Deny from the UI** — tool calls surface with full context. Read the command before approving.
+- **Activity panel** — every tool call, every file read, every bash command — streaming in real-time.
+- **Webhook alerts** — get Slack/Discord notifications when a session needs your approval. Step away from the desk.
+- **Fail-open safety** — if Forge goes down, Claude Code keeps working. No single point of failure.
+
+### Command Palette
+
+VS Code-style launcher. Hit **Ctrl+K** from anywhere.
+
+- **Fuzzy search** — find any view, action, or command instantly.
+- **Keyboard-first** — arrow keys to navigate, Enter to execute, Escape to close.
+- **Full keyboard shortcuts** — Ctrl+1-5 for views, Ctrl+N for new terminal, ? for help.
+
+### Prompt Engineering at Scale
+
+Stop rewriting the same prompts. Build a library. Track what works.
+
+- **10 built-in prompts** — security review, test generation, PR review, refactoring, and more.
+- **Custom prompts** — build your own with categories, tags, and variables.
+- **One-click launch** — any prompt spawns a Claude session instantly.
+- **Usage analytics** — which prompts get used, how often, by which projects.
+
+### Full Integration Layer
+
+Pull context from the tools your team already uses.
+
+- **GitHub** — browse repos, issues, and PRs. Inject as session context.
+- **Linear** — fetch tickets and inject them. Claude works on your actual backlog.
+- **Slack / Discord / Webhooks** — real-time notifications. Session ended. Permission needed. Error occurred.
+- **File parsing** — drag Excel, CSV, PDF, code files. Forge parses and injects them.
+
+### Home Dashboard
+
+Your mission control. See everything at a glance.
+
+- **Stats row** — active sessions, today's cost, workflows, terminals.
+- **Quick actions** — one-click to launch terminal, design workflow, browse prompts.
+- **Recent activity** — last 5 sessions with status and timing.
+- **Active workflows** — see which agent pipelines are running.
+
+---
+
+## ⚙️ How It Works
+
+```
+┌─────────────┐    JSONL logs     ┌──────────────┐    WebSocket     ┌─────────────┐
+│             │ ────────────────▶ │              │ ◀────────────▶  │             │
+│ Claude Code │                   │ Forge Server │                  │  Forge UI   │
+│  (terminal) │ ◀── hook bridge ─▶│  (Express)   │                  │  (React)    │
+│             │   HTTP POST/GET   │              │                  │             │
+└─────────────┘                   └──────────────┘                  └─────────────┘
 ```
 
-## Development
+Forge doesn't wrap or replace Claude Code. It **instruments** it:
+
+1. **Session logs** — watches `~/.claude/projects/` in real-time. Every message, tool call, and token count is parsed the instant it's written.
+
+2. **Hook bridge** — a zero-dependency Python script that installs into Claude Code's native hook system. It intercepts tool calls for permission control and enables bidirectional messaging.
+
+3. **Embedded terminal** — spawns Claude Code as a child process via `node-pty`. Full PTY with xterm.js rendering over WebSocket. You're not watching a replay — you're driving.
+
+4. **Agent runner** — executes multi-agent pipelines using `claude -p` in topological order. Parent output is passed to children. Live activity broadcast via WebSocket.
+
+5. **Permission flow** — `PreToolUse` hooks POST to Forge. The UI renders Allow/Deny. The hook polls for your decision. 5-minute timeout. If Forge is unreachable, Claude keeps going (fail-open).
+
+---
+
+## 🛠 Tech Stack
+
+| | Technology |
+|---|-----------|
+| **Frontend** | React 18 · Vite · Tailwind CSS · Zustand · React Flow · xterm.js |
+| **Backend** | Express · WebSocket (ws) · node-pty · chokidar |
+| **Integrations** | Octokit · Linear SDK · Slack/Discord webhooks |
+| **Persistence** | Local JSON files in `~/.claude/forge/` |
+| **Hook bridge** | Python 3 stdlib — zero dependencies |
+
+---
+
+## 🗺 Roadmap
+
+Forge is under active development. Here's where we're headed:
+
+- [ ] **Session replay** — rewind any Claude session step-by-step. See every decision, every file change.
+- [ ] **Cost guards** — auto-kill sessions that exceed a budget. Hard limits, not just tracking.
+- [ ] **Automated pipelines** — "on every git push, run this Claude prompt." CI/CD for AI.
+- [ ] **Session memory** — persist what Claude learned across sessions. Context that survives restarts.
+- [ ] **Agent marketplace** — community-shared agent architectures. Import with one click.
+- [ ] **Team mode** — shared dashboards, prompt libraries, and cost tracking across a team.
+- [ ] **`npx forge`** — one-command install. Zero config.
+- [ ] **VS Code extension** — Forge as a sidebar panel.
+
+---
+
+## 🧑‍💻 Development
 
 ```bash
-git clone https://github.com/IsmailQayyum/forge
-cd forge
-npm install
+git clone https://github.com/IsmailQayyum/forge.git
+cd forge && npm install
+
+# Terminal 1 — frontend with HMR
 npm run dev
+
+# Terminal 2 — backend
+node server/index.js
 ```
 
-Vite dev server runs at `http://localhost:5173` with HMR, API proxied to port 3333.
+### Production
 
-## Architecture
-
-```
-forge/
-├── server/               # Express + WebSocket backend
-│   ├── index.js          # Server entry, WebSocket hub
-│   ├── sessions.js       # Claude Code JSONL log watcher
-│   ├── agents/
-│   │   ├── store.js      # Agent architecture persistence
-│   │   └── claudemd.js   # CLAUDE.md generator
-│   ├── routes/           # API routes (sessions, hooks, agents, context, integrations)
-│   └── integrations/     # GitHub, Linear, file parsers
-├── hooks/
-│   └── forge-bridge.py   # Claude Code hook bridge
-├── src/                  # React frontend
-│   ├── components/
-│   │   ├── SessionDashboard/   # Live session monitor + token burn rate
-│   │   ├── Messenger/          # Agent chat interface
-│   │   ├── AgentArchitect/     # React Flow canvas + CLAUDE.md export
-│   │   ├── ContextHub/         # File + integration context
-│   │   └── Integrations/       # Connection management
-│   ├── store/            # Zustand state
-│   └── hooks/            # WebSocket connection
-├── src/cli/
-│   └── install.js        # forge install/uninstall commands
-└── bin/forge.js          # CLI entry point
+```bash
+npx vite build && node server/index.js --serve
 ```
 
-## How it works
+---
 
-Forge reads Claude Code's JSONL session logs from `~/.claude/projects/` using chokidar file watchers. It parses assistant messages, tool calls, token usage, and sub-agent spawns in real-time and broadcasts them over WebSocket to the React frontend.
+## 💾 Data & Privacy
 
-The hook bridge (`forge-bridge.py`) is installed into Claude Code's hook system. It sends HTTP events to the Forge server on every tool call and checks for pending user messages, enabling bidirectional communication between Forge and Claude Code sessions.
+Everything stays on your machine. Forge has no cloud, no telemetry, no accounts.
 
-## License
+| Data | Location |
+|------|----------|
+| Session logs | `~/.claude/projects/` |
+| Architectures | `~/.claude/forge/architectures.json` |
+| Prompts | `~/.claude/forge/prompts.json` |
+| Cost history | `~/.claude/forge/cost-history.json` |
+| Agent registry | `~/.claude/forge/registry.json` |
+| Webhooks | `~/.claude/forge/notifications.json` |
 
-MIT
+---
+
+<p align="center">
+  <strong>Built for developers who take Claude Code seriously.</strong>
+</p>
+
+<p align="center">
+  <img src=".github/logo.svg" width="60" alt="Forge" />
+</p>
