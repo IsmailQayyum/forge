@@ -16,6 +16,7 @@ import { CapabilitiesPanel } from "./CapabilitiesPanel.jsx";
 import { TriggerPanel } from "./TriggerPanel.jsx";
 import { ActionPanel } from "./ActionPanel.jsx";
 import { XTerminal } from "../Messenger/XTerminal.jsx";
+import { RunSummary } from "./RunSummary.jsx";
 import {
   GitBranch, Plus, Save, Trash2, FileDown, Play, Upload, Download,
   ChevronDown, FolderOpen, Layers, Zap, Shield, Code, Bug, BookOpen,
@@ -164,8 +165,14 @@ export function AgentArchitect() {
   const fileInputRef = useRef(null);
 
   // ── Run state ──
-  const [activeRun, setActiveRun] = useState(null); // { runId, agents: { nodeId: { status, terminalId, label } } }
+  // Use a ref for the actual run data (mutated directly to avoid React batching issues)
+  // and a counter state to trigger re-renders when run data changes
+  const activeRunRef = useRef(null);
+  const [runTick, setRunTick] = useState(0);
+  const activeRun = activeRunRef.current;
+  const bumpRun = () => setRunTick((n) => n + 1);
   const [showRunDialog, setShowRunDialog] = useState(false);
+  const [completedRun, setCompletedRun] = useState(null); // shown as RunSummary overlay
   const [focusedAgent, setFocusedAgent] = useState(null); // nodeId of agent whose terminal to show
   const [workflowEnabled, setWorkflowEnabled] = useState(false);
   const [showRegistryPicker, setShowRegistryPicker] = useState(false);
@@ -176,44 +183,38 @@ export function AgentArchitect() {
 
   const saveArchitecture = useForgeStore((s) => s.saveArchitecture);
 
-  // ── WebSocket ref ──
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (window.__forgeWs && window.__forgeWs.readyState === 1) {
-        wsRef.current = window.__forgeWs;
-      }
-    }, 500);
-    return () => clearInterval(interval);
-  }, []);
+  const currentRunIdRef = useRef(null);
 
-  // ── Listen for run events ──
+  // ── WebSocket listener — polls for WS and attaches message handler ──
   useEffect(() => {
+    let currentWs = null;
+    let handler = null;
+
     function handleWs(event) {
       try {
         const msg = JSON.parse(event.data);
+        const run = activeRunRef.current;
 
         if (msg.type === "RUN_STARTED" && msg.payload) {
           const { runId, agents } = msg.payload;
+          // Only accept if this matches our current run (or no filter set)
+          if (currentRunIdRef.current && currentRunIdRef.current !== runId) return;
           const agentMap = {};
           for (const a of agents) {
             agentMap[a.nodeId] = { ...a };
           }
-          setActiveRun({ runId, agents: agentMap });
+          activeRunRef.current = { runId, agents: agentMap, status: "running" };
+          bumpRun();
         }
 
         if (msg.type === "AGENT_STATUS" && msg.payload) {
           const { runId, nodeId, status, terminalId, label } = msg.payload;
-          setActiveRun((prev) => {
-            if (!prev || prev.runId !== runId) return prev;
-            return {
-              ...prev,
-              agents: {
-                ...prev.agents,
-                [nodeId]: { ...prev.agents[nodeId], status, terminalId, label },
-              },
-            };
-          });
-          // Update node data with run status for visual indicators
+          if (run && run.runId === runId && run.agents[nodeId]) {
+            // Mutate the ref directly — no batching issues
+            run.agents[nodeId] = { ...run.agents[nodeId], status, terminalId, label };
+            bumpRun();
+          }
+          // Update node visual
           setNodes((nds) =>
             nds.map((n) =>
               n.id === nodeId ? { ...n, data: { ...n.data, runStatus: status } } : n
@@ -226,44 +227,65 @@ export function AgentArchitect() {
         }
 
         if (msg.type === "AGENT_ACTIVITY" && msg.payload) {
-          const { nodeId, activity } = msg.payload;
-          // Update node data with live activity text
+          const { runId, nodeId, activity } = msg.payload;
+          // Update node bubble with live activity
           setNodes((nds) =>
             nds.map((n) =>
               n.id === nodeId ? { ...n, data: { ...n.data, runActivity: activity } } : n
             )
           );
-          // Update run state for bottom bar
-          setActiveRun((prev) => {
-            if (!prev) return prev;
-            const agent = prev.agents[nodeId];
-            if (!agent) return prev;
-            return {
-              ...prev,
-              agents: { ...prev.agents, [nodeId]: { ...agent, lastActivity: activity } },
-            };
-          });
+          // Update bottom bar
+          if (run && run.runId === runId && run.agents[nodeId]) {
+            run.agents[nodeId].lastActivity = activity;
+            bumpRun();
+          }
         }
 
         if (msg.type === "RUN_COMPLETED" && msg.payload) {
-          setActiveRun((prev) => {
-            if (!prev || prev.runId !== msg.payload.runId) return prev;
-            return { ...prev, status: "completed" };
-          });
-          // Clear run status from nodes
+          if (run && run.runId === msg.payload.runId) {
+            run.status = "completed";
+            run.duration = msg.payload.duration;
+            run.gitBefore = msg.payload.gitBefore;
+            run.gitAfter = msg.payload.gitAfter;
+            bumpRun();
+            // Show run summary overlay
+            setCompletedRun({
+              ...msg.payload,
+              agents: run.agents,
+            });
+          }
+          // Clear activity bubbles but keep runStatus on nodes
           setNodes((nds) =>
             nds.map((n) => ({ ...n, data: { ...n.data, runActivity: undefined } }))
           );
         }
-      } catch {}
+      } catch (err) {
+        console.error("[Forge WS handler]", err);
+      }
     }
 
-    const ws = wsRef.current;
-    if (ws) {
-      ws.addEventListener("message", handleWs);
-      return () => ws.removeEventListener("message", handleWs);
+    function attach() {
+      const ws = window.__forgeWs;
+      if (ws && ws.readyState === 1 && ws !== currentWs) {
+        if (currentWs && handler) {
+          currentWs.removeEventListener("message", handler);
+        }
+        currentWs = ws;
+        wsRef.current = ws;
+        handler = handleWs;
+        ws.addEventListener("message", handleWs);
+      }
     }
-  }, [wsRef.current]);
+
+    attach();
+    const interval = setInterval(attach, 500);
+    return () => {
+      clearInterval(interval);
+      if (currentWs && handler) {
+        currentWs.removeEventListener("message", handler);
+      }
+    };
+  }, []);
 
   // ── Load saved architectures on mount ──
   useEffect(() => {
@@ -294,7 +316,9 @@ export function AgentArchitect() {
     setSelectedNode(null);
     setShowList(false);
     setShowTemplates(false);
-    setActiveRun(null);
+    currentRunIdRef.current = null;
+    activeRunRef.current = null;
+    bumpRun();
     setFocusedAgent(null);
     // Check workflow status
     if (arch.id) {
@@ -313,7 +337,8 @@ export function AgentArchitect() {
     setSelectedNode(null);
     setShowList(false);
     setShowTemplates(false);
-    setActiveRun(null);
+    activeRunRef.current = null;
+    bumpRun();
     setFocusedAgent(null);
   }
 
@@ -324,7 +349,8 @@ export function AgentArchitect() {
     setSavedArchId(null);
     setSelectedNode(null);
     setShowList(false);
-    setActiveRun(null);
+    activeRunRef.current = null;
+    bumpRun();
     setFocusedAgent(null);
   }
 
@@ -496,9 +522,22 @@ export function AgentArchitect() {
   async function executeArchitecture(targetDir, autoApprove = false) {
     setShowRunDialog(false);
 
-    // Reset everything from previous run
-    setActiveRun(null);
+    // ── HARD RESET — wipe all previous run state ──
+    activeRunRef.current = null;
+    bumpRun();
     setFocusedAgent(null);
+    setCompletedRun(null);
+    currentRunIdRef.current = null;
+
+    // Force-clear all node run visuals immediately
+    setNodes((nds) => nds.map((n) => ({
+      ...n,
+      data: {
+        ...n.data,
+        runStatus: "pending",
+        runActivity: undefined,
+      },
+    })));
 
     // Save first
     const id = savedArchId || `arch-${Date.now()}`;
@@ -510,12 +549,6 @@ export function AgentArchitect() {
       body: JSON.stringify(arch),
     });
 
-    // Clear old status and mark all nodes as pending
-    setNodes((nds) => nds.map((n) => ({
-      ...n,
-      data: { ...n.data, runStatus: "pending", runActivity: undefined },
-    })));
-
     try {
       const res = await fetch(`/api/agents/${id}/execute`, {
         method: "POST",
@@ -525,19 +558,25 @@ export function AgentArchitect() {
       const data = await res.json();
       if (data.error) {
         console.error("Execute error:", data.error);
-        setNodes((nds) => nds.map((n) => ({ ...n, data: { ...n.data, runStatus: undefined } })));
+        setNodes((nds) => nds.map((n) => ({ ...n, data: { ...n.data, runStatus: undefined, runActivity: undefined } })));
+        return;
       }
-      // Run started — WS events will update status
+      // Track this run ID so we ignore stale events from old runs
+      if (data.runId) {
+        currentRunIdRef.current = data.runId;
+      }
     } catch (err) {
       console.error("Failed to execute:", err);
-      setNodes((nds) => nds.map((n) => ({ ...n, data: { ...n.data, runStatus: undefined } })));
+      setNodes((nds) => nds.map((n) => ({ ...n, data: { ...n.data, runStatus: undefined, runActivity: undefined } })));
     }
   }
 
   function stopRun() {
-    setActiveRun(null);
+    currentRunIdRef.current = null;
+    activeRunRef.current = null;
+    bumpRun();
     setFocusedAgent(null);
-    setNodes((nds) => nds.map((n) => ({ ...n, data: { ...n.data, runStatus: undefined } })));
+    setNodes((nds) => nds.map((n) => ({ ...n, data: { ...n.data, runStatus: undefined, runActivity: undefined } })));
   }
 
   async function markAgentDone(nodeId) {
@@ -563,20 +602,16 @@ export function AgentArchitect() {
   }
 
   async function fetchAgentOutput(nodeId) {
-    if (!activeRun) return;
+    const run = activeRunRef.current;
+    if (!run) return;
     try {
-      const res = await fetch(`/api/agents/runs/${activeRun.runId}/agents/${nodeId}/output`);
+      const res = await fetch(`/api/agents/runs/${run.runId}/agents/${nodeId}/output`);
       const data = await res.json();
-      setActiveRun((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          agents: {
-            ...prev.agents,
-            [nodeId]: { ...prev.agents[nodeId], output: data.output, outputFetched: true },
-          },
-        };
-      });
+      if (run.agents[nodeId]) {
+        run.agents[nodeId].output = data.output;
+        run.agents[nodeId].outputFetched = true;
+        bumpRun();
+      }
     } catch {}
   }
 
@@ -809,29 +844,31 @@ export function AgentArchitect() {
               </>
             )}
 
-            {/* Workflow toggle */}
+            {/* Workflow toggle — Enable / Disable */}
             {savedArchId && hasTriggers && !isRunning && (
-              <button
-                onClick={async () => {
-                  if (workflowEnabled) {
+              workflowEnabled ? (
+                <button
+                  onClick={async () => {
                     await fetch(`/api/workflows/${savedArchId}/disable`, { method: "POST" });
                     setWorkflowEnabled(false);
-                  } else {
-                    // Need to save first, then show dialog for target dir
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] border bg-purple-500/20 border-purple-400/40 text-purple-400 hover:bg-red-500/20 hover:border-red-400/40 hover:text-red-400 transition-colors group"
+                >
+                  <Zap size={11} />
+                  <span className="group-hover:hidden">Workflow Active</span>
+                  <span className="hidden group-hover:inline">Disable Workflow</span>
+                </button>
+              ) : (
+                <button
+                  onClick={async () => {
                     await save();
                     setShowRunDialog("workflow");
-                  }
-                }}
-                className={clsx(
-                  "flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] border transition-colors",
-                  workflowEnabled
-                    ? "bg-purple-500/20 border-purple-400/40 text-purple-400 hover:bg-purple-500/30"
-                    : "bg-forge-surface border-forge-border text-forge-muted hover:text-purple-400 hover:border-purple-400"
-                )}
-              >
-                <Zap size={11} />
-                {workflowEnabled ? "Workflow On" : "Enable Workflow"}
-              </button>
+                  }}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] border bg-forge-surface border-forge-border text-forge-muted hover:text-purple-400 hover:border-purple-400 transition-colors"
+                >
+                  <Zap size={11} /> Enable Workflow
+                </button>
+              )
             )}
 
             {isRunning ? (
@@ -996,6 +1033,22 @@ export function AgentArchitect() {
               </div>
             </div>
           )}
+
+          {/* Run summary — shown after run completes */}
+          {completedRun && !activeRun?.status?.match?.(/running/) && (
+            <RunSummary
+              run={completedRun}
+              onClose={() => setCompletedRun(null)}
+              onViewDiff={() => {
+                // Could open a diff viewer — for now just log
+                console.log("View diff:", completedRun.gitBefore, "→", completedRun.gitAfter);
+              }}
+              onViewAgent={(nodeId) => {
+                setFocusedAgent(nodeId);
+                fetchAgentOutput(nodeId);
+              }}
+            />
+          )}
         </div>
       </div>
 
@@ -1147,6 +1200,9 @@ function RunDialog({ archName, agentCount, isWorkflowMode, onRun, onClose }) {
   const [targetDir, setTargetDir] = useState("");
   const [autoApprove, setAutoApprove] = useState(false);
   const [projects, setProjects] = useState([]);
+  const [browsePath, setBrowsePath] = useState(null); // null = not browsing, string = current browse dir
+  const [browseDirs, setBrowseDirs] = useState([]);
+  const [browseParent, setBrowseParent] = useState(null);
 
   useEffect(() => {
     fetch("/api/fs/projects")
@@ -1154,6 +1210,18 @@ function RunDialog({ archName, agentCount, isWorkflowMode, onRun, onClose }) {
       .then((data) => setProjects(Array.isArray(data) ? data : []))
       .catch(() => {});
   }, []);
+
+  function openBrowser(dir) {
+    const url = dir ? `/api/fs/browse?path=${encodeURIComponent(dir)}` : "/api/fs/browse";
+    fetch(url)
+      .then((r) => r.json())
+      .then((data) => {
+        setBrowsePath(data.current);
+        setBrowseDirs(data.dirs || []);
+        setBrowseParent(data.parent || null);
+      })
+      .catch(() => {});
+  }
 
   return (
     <div className="absolute inset-0 z-20 bg-forge-bg/90 backdrop-blur-sm flex items-center justify-center">
@@ -1182,19 +1250,74 @@ function RunDialog({ archName, agentCount, isWorkflowMode, onRun, onClose }) {
         <div className="p-5 flex flex-col gap-4">
           <div>
             <label className="text-[10px] text-forge-muted uppercase tracking-wider mb-1.5 block">Target Directory</label>
-            <input
-              value={targetDir}
-              onChange={(e) => setTargetDir(e.target.value)}
-              placeholder="~/projects/my-app"
-              className="w-full bg-forge-bg border border-forge-border rounded-lg px-3 py-2 text-xs text-forge-text font-mono placeholder:text-forge-muted outline-none focus:border-forge-muted"
-            />
+            <div className="flex gap-1.5">
+              <input
+                value={targetDir}
+                onChange={(e) => setTargetDir(e.target.value)}
+                placeholder="~/projects/my-app"
+                className="flex-1 bg-forge-bg border border-forge-border rounded-lg px-3 py-2 text-xs text-forge-text font-mono placeholder:text-forge-muted outline-none focus:border-forge-muted"
+              />
+              <button
+                onClick={() => openBrowser(targetDir || null)}
+                className="flex items-center gap-1 px-3 py-2 rounded-lg bg-forge-bg border border-forge-border text-[11px] text-forge-muted hover:text-forge-text hover:border-forge-muted transition-colors shrink-0"
+              >
+                <FolderOpen size={12} /> Browse
+              </button>
+            </div>
           </div>
 
-          {projects.length > 0 && (
+          {/* Folder browser */}
+          {browsePath !== null && (
+            <div className="bg-forge-bg border border-forge-border rounded-lg overflow-hidden">
+              <div className="px-3 py-2 border-b border-forge-border flex items-center gap-2 bg-forge-surface/50">
+                {browseParent && browseParent !== browsePath && (
+                  <button
+                    onClick={() => openBrowser(browseParent)}
+                    className="p-1 rounded text-forge-muted hover:text-forge-text transition-colors"
+                    title="Go up"
+                  >
+                    <ChevronDown size={12} className="rotate-90" />
+                  </button>
+                )}
+                <p className="text-[10px] text-forge-muted font-mono truncate flex-1">{browsePath}</p>
+                <button
+                  onClick={() => { setTargetDir(browsePath); setBrowsePath(null); }}
+                  className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-forge-accent/20 text-forge-accent hover:bg-forge-accent/30 transition-colors shrink-0"
+                >
+                  <Check size={10} /> Select
+                </button>
+                <button
+                  onClick={() => setBrowsePath(null)}
+                  className="p-0.5 rounded text-forge-muted hover:text-forge-text"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+              <div className="max-h-40 overflow-y-auto">
+                {browseDirs.length === 0 ? (
+                  <p className="text-[10px] text-forge-muted text-center py-4">No subdirectories</p>
+                ) : (
+                  browseDirs.map((d) => (
+                    <button
+                      key={d.path}
+                      onClick={() => openBrowser(d.path)}
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-forge-surface/50 transition-colors"
+                    >
+                      <FolderOpen size={11} className="text-forge-accent shrink-0" />
+                      <span className="text-[11px] text-forge-text truncate">{d.name}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Quick-pick projects */}
+          {browsePath === null && projects.length > 0 && (
             <div>
-              <label className="text-[10px] text-forge-muted uppercase tracking-wider mb-1.5 block">Or pick a project</label>
+              <label className="text-[10px] text-forge-muted uppercase tracking-wider mb-1.5 block">Projects</label>
               <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
-                {projects.slice(0, 8).map((p) => (
+                {projects.slice(0, 12).map((p) => (
                   <button
                     key={p.path}
                     onClick={() => setTargetDir(p.path)}

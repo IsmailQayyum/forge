@@ -1,12 +1,13 @@
 import React from "react";
 import {
   LayoutDashboard, MessageSquare, GitBranch, Paperclip, Plug,
-  Flame, BookOpen, DollarSign, FileText, Bot,
+  Flame, BookOpen, DollarSign, FileText, Bot, Home, Settings,
 } from "lucide-react";
 import { useForgeStore } from "../../store/index.js";
 import clsx from "clsx";
 
 const NAV_TOP = [
+  { id: "home", icon: Home, label: "Home" },
   { id: "sessions", icon: LayoutDashboard, label: "Sessions" },
   { id: "messenger", icon: MessageSquare, label: "Terminal" },
   { id: "prompts", icon: BookOpen, label: "Prompts" },
@@ -19,6 +20,7 @@ const NAV_BOTTOM = [
   { id: "claudemd", icon: FileText, label: "CLAUDE.md" },
   { id: "context", icon: Paperclip, label: "Context" },
   { id: "integrations", icon: Plug, label: "Integrations" },
+  { id: "settings", icon: Settings, label: "Settings" },
 ];
 
 export function Sidebar({ activeView, onNavigate }) {
@@ -59,7 +61,25 @@ export function Sidebar({ activeView, onNavigate }) {
           onClick={() => onNavigate(id)}
         />
       ))}
+
+      {/* Connection indicator */}
+      <div className="mt-auto pb-2">
+        <ConnectionDot />
+      </div>
     </aside>
+  );
+}
+
+function ConnectionDot() {
+  const connected = useForgeStore((s) => s.connected);
+  return (
+    <div
+      title={connected ? "Connected to Forge server" : "Disconnected — reconnecting..."}
+      className={clsx(
+        "w-2.5 h-2.5 rounded-full transition-colors",
+        connected ? "bg-forge-green" : "bg-forge-red animate-pulse"
+      )}
+    />
   );
 }
 

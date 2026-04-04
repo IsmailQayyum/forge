@@ -16,6 +16,7 @@ export function useWebSocket() {
     ws.onopen = () => {
       console.log("Forge connected");
       window.__forgeWs = ws;
+      useForgeStore.getState().setConnected(true);
       if (reconnectRef.current) {
         clearTimeout(reconnectRef.current);
         reconnectRef.current = null;
@@ -30,6 +31,7 @@ export function useWebSocket() {
     };
 
     ws.onclose = () => {
+      useForgeStore.getState().setConnected(false);
       reconnectRef.current = setTimeout(connect, 2000);
     };
 

@@ -20,7 +20,7 @@ export function AgentNode({ data, selected }) {
     <div
       className={clsx(
         "relative rounded-xl border px-4 py-3 min-w-[160px] bg-forge-surface transition-all",
-        data.runStatus === "running" && "ring-2 ring-forge-accent/50 animate-pulse",
+        data.runStatus === "running" && "ring-2 ring-forge-accent/50",
         data.runStatus === "completed" && "border-forge-green/50",
         data.runStatus === "failed" && "border-forge-red",
         !data.runStatus || data.runStatus === "pending"
@@ -32,6 +32,15 @@ export function AgentNode({ data, selected }) {
           : null
       )}
     >
+      {/* Live activity bubble — sits at top of node */}
+      {data.runActivity && data.runStatus === "running" && (
+        <div className="mb-2 -mx-1 rounded-lg bg-forge-bg/90 border border-forge-accent/30 px-2.5 py-1.5">
+          <p className="text-[10px] text-forge-accent font-mono truncate animate-pulse leading-tight">
+            {data.runActivity}
+          </p>
+        </div>
+      )}
+
       {data.runStatus === "pending" && (
         <Clock size={14} className="absolute top-2 right-2 text-gray-400" />
       )}
@@ -58,7 +67,7 @@ export function AgentNode({ data, selected }) {
         <div>
           <p className="text-xs font-semibold text-forge-text leading-none">{data.label}</p>
           <p className="text-[10px] text-forge-muted mt-0.5">{data.role}</p>
-          {data.systemPrompt && (
+          {data.systemPrompt && !data.runStatus && (
             <p className="text-[9px] text-forge-muted/60 mt-0.5 leading-tight">
               {data.systemPrompt.length > 40
                 ? data.systemPrompt.slice(0, 40) + "\u2026"
@@ -68,7 +77,7 @@ export function AgentNode({ data, selected }) {
         </div>
       </div>
 
-      {data.capabilities?.length > 0 && (
+      {data.capabilities?.length > 0 && !data.runStatus && (
         <div className="flex flex-wrap gap-1">
           {data.capabilities.slice(0, 3).map((cap) => (
             <span key={cap} className="text-[9px] bg-forge-border text-forge-muted rounded px-1.5 py-0.5">
@@ -88,17 +97,18 @@ export function AgentNode({ data, selected }) {
         </div>
       )}
 
-      {/* Live activity during run */}
-      {data.runActivity && data.runStatus === "running" && (
-        <div className="mt-2 pt-1.5 border-t border-forge-border/50">
-          <p className="text-[9px] text-forge-accent font-mono truncate leading-tight animate-pulse">
-            {data.runActivity}
-          </p>
+      {/* Status indicator during run */}
+      {data.runStatus === "running" && (
+        <div className="mt-2 pt-1.5 border-t border-forge-accent/30">
+          <div className="flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-forge-accent animate-pulse" />
+            <p className="text-[9px] text-forge-accent font-medium">Working...</p>
+          </div>
         </div>
       )}
 
       {data.runStatus === "completed" && (
-        <div className="mt-2 pt-1.5 border-t border-forge-border/50">
+        <div className="mt-2 pt-1.5 border-t border-forge-green/30">
           <p className="text-[9px] text-forge-green font-medium">Completed</p>
         </div>
       )}

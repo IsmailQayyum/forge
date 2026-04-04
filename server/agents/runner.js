@@ -12,6 +12,11 @@
 
 import { spawnTerminal, writeToTerminal, onTerminalExit, onTerminalData, getTerminalBuffer } from "../terminal.js";
 import { CAPABILITY_DESCRIPTIONS } from "./claudemd.js";
+import { execSync } from "child_process";
+
+function gitHead(cwd) {
+  try { return execSync("git rev-parse HEAD", { cwd, encoding: "utf8", timeout: 3000 }).trim(); } catch { return null; }
+}
 
 // Strip ANSI escape codes
 function stripAnsi(str) {
@@ -21,23 +26,34 @@ function stripAnsi(str) {
 // Extract a meaningful activity line from raw terminal output
 function parseActivity(raw) {
   const clean = stripAnsi(raw).trim();
-  if (!clean) return null;
+  if (!clean || clean.length < 3) return null;
 
-  // Look for tool use patterns
-  const toolMatch = clean.match(/(?:Read|Write|Edit|Bash|Grep|Glob|Agent|Search)\s*[:(]/i);
-  if (toolMatch) return clean.slice(0, 80);
+  // Get all meaningful lines
+  const lines = clean.split("\n").filter((l) => l.trim().length > 2);
+  if (lines.length === 0) return null;
 
-  // Look for file paths
-  const fileMatch = clean.match(/[a-zA-Z0-9_\-/.]+\.[a-zA-Z]{1,6}/);
-  if (fileMatch) return clean.slice(0, 80);
+  // Prefer tool use patterns
+  for (const line of lines) {
+    const toolMatch = line.match(/(?:Read|Write|Edit|Bash|Grep|Glob|Agent|Search|Fetch|WebSearch|TodoWrite)\s*[:(]/i);
+    if (toolMatch) return line.trim().slice(0, 100);
+  }
 
-  // Skip very short or empty lines
-  if (clean.length < 5) return null;
+  // Prefer file paths
+  for (const line of lines) {
+    const fileMatch = line.match(/[a-zA-Z0-9_\-/.]+\.[a-zA-Z]{1,6}/);
+    if (fileMatch) return line.trim().slice(0, 100);
+  }
 
-  // Return last meaningful chunk
-  const lines = clean.split("\n").filter((l) => l.trim().length > 3);
-  const last = lines[lines.length - 1];
-  return last ? last.slice(0, 80) : null;
+  // Prefer lines with keywords that indicate progress
+  for (const line of lines) {
+    if (/(?:reading|writing|running|checking|analyzing|creating|updating|looking|searching|found|fixing|testing)/i.test(line)) {
+      return line.trim().slice(0, 100);
+    }
+  }
+
+  // Return the last non-trivial line
+  const last = lines[lines.length - 1].trim();
+  return last.length > 3 ? last.slice(0, 100) : null;
 }
 
 class RunManager {
@@ -70,6 +86,11 @@ class RunManager {
         }])
       ),
       startedAt: r.startedAt,
+      completedAt: r.completedAt,
+      targetDir: r.targetDir,
+      gitBefore: r.gitBefore,
+      gitAfter: r.gitAfter,
+      duration: r.completedAt ? r.completedAt - r.startedAt : null,
     }));
   }
 
@@ -103,6 +124,9 @@ class RunManager {
       };
     }
 
+    // Capture git state before run
+    const gitBefore = gitHead(targetDir);
+
     const run = {
       id: runId,
       archId: architecture.id,
@@ -114,6 +138,9 @@ class RunManager {
       autoApprove,
       status: "running",
       startedAt: Date.now(),
+      gitBefore,
+      gitAfter: null,
+      completedAt: null,
     };
 
     this.runs.set(runId, run);
@@ -226,11 +253,14 @@ class RunManager {
 
     // Build CLI args — use -p (print mode) for fully autonomous execution
     // Claude runs, does tool use, completes the task, and exits on its own
-    const args = ["-p"];
+    const args = ["-p", "--verbose"];
     if (run.autoApprove) {
       args.push("--dangerously-skip-permissions");
     }
+    // Pass prompt as the last argument
     args.push(prompt);
+
+    console.log(`[Runner] Starting agent "${agent.label}" (${nodeId}) with ${args.length} args, autoApprove=${!!run.autoApprove}`);
 
     // Spawn terminal with prompt as CLI arg — no manual input needed
     const result = spawnTerminal({ cwd: run.targetDir, args });
@@ -243,8 +273,8 @@ class RunManager {
     let activityThrottle = 0;
     onTerminalData(result.terminalId, (termId, data) => {
       const now = Date.now();
-      // Throttle activity broadcasts to every 500ms
-      if (now - activityThrottle < 500) return;
+      // Throttle activity broadcasts to every 250ms
+      if (now - activityThrottle < 250) return;
       activityThrottle = now;
 
       const activity = parseActivity(data);
@@ -346,7 +376,16 @@ class RunManager {
     );
     if (allDone) {
       run.status = "completed";
-      this._broadcast("RUN_COMPLETED", { runId, archName: run.archName });
+      run.completedAt = Date.now();
+      run.gitAfter = gitHead(run.targetDir);
+      this._broadcast("RUN_COMPLETED", {
+        runId,
+        archName: run.archName,
+        gitBefore: run.gitBefore,
+        gitAfter: run.gitAfter,
+        targetDir: run.targetDir,
+        duration: run.completedAt - run.startedAt,
+      });
     }
   }
 

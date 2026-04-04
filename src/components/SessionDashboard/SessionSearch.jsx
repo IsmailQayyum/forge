@@ -72,6 +72,9 @@ export function SessionSearch({ onSelectSession }) {
                 <p className="text-[11px] font-semibold text-forge-text truncate">
                   {s.displayName || s.project || s.id?.slice(0, 8)}
                 </p>
+                {s.project && s.displayName && s.displayName !== s.project && (
+                  <p className="text-[10px] text-forge-accent truncate">{s.project}</p>
+                )}
                 <p className="text-[10px] text-forge-muted">
                   {s.messages?.length || 0} messages · {s.toolCalls?.length || 0} tools · {s.status}
                 </p>

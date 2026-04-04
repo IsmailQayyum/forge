@@ -62,3 +62,59 @@ gitRouter.get("/diff/file", (req, res) => {
   const diff = git(`diff HEAD -- "${file}"`, cwd);
   res.json({ file, diff });
 });
+
+// Get recent commits
+gitRouter.get("/log", (req, res) => {
+  const cwd = req.query.cwd;
+  const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+  if (!cwd) return res.status(400).json({ error: "cwd required" });
+
+  const raw = git(`log --pretty=format:"%H|%h|%an|%ar|%s" -${limit}`, cwd);
+  if (!raw) return res.json({ commits: [] });
+
+  const commits = raw.split("\n").filter(Boolean).map((line) => {
+    const [hash, short, author, timeAgo, ...rest] = line.split("|");
+    return { hash, short, author, timeAgo, message: rest.join("|") };
+  });
+  res.json({ commits });
+});
+
+// Get diff between two commits (useful for seeing what an agent run changed)
+gitRouter.get("/diff/range", (req, res) => {
+  const { cwd, from, to } = req.query;
+  if (!cwd) return res.status(400).json({ error: "cwd required" });
+  const fromRef = from || "HEAD~1";
+  const toRef = to || "HEAD";
+
+  const stat = git(`diff ${fromRef}..${toRef} --stat`, cwd);
+  const diff = git(`diff ${fromRef}..${toRef}`, cwd);
+  const files = git(`diff ${fromRef}..${toRef} --name-status`, cwd);
+
+  const changedFiles = files ? files.split("\n").filter(Boolean).map((line) => {
+    const [status, ...parts] = line.split("\t");
+    return { status, file: parts.join("\t") };
+  }) : [];
+
+  res.json({
+    from: fromRef,
+    to: toRef,
+    stat,
+    diff: diff?.slice(0, 100000),
+    changedFiles,
+  });
+});
+
+// Stash and unstash (for undoing agent changes)
+gitRouter.post("/stash", (req, res) => {
+  const { cwd, message } = req.body;
+  if (!cwd) return res.status(400).json({ error: "cwd required" });
+  const result = git(`stash push -m "${message || "Forge stash"}"`, cwd);
+  res.json({ ok: !!result, message: result });
+});
+
+gitRouter.post("/stash/pop", (req, res) => {
+  const { cwd } = req.body;
+  if (!cwd) return res.status(400).json({ error: "cwd required" });
+  const result = git("stash pop", cwd);
+  res.json({ ok: !!result, message: result });
+});

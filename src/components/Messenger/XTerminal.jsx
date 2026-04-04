@@ -95,33 +95,7 @@ export const XTerminal = forwardRef(function XTerminal({ terminalId, wsRef, onRe
     });
     resizeObserver.observe(containerRef.current);
 
-    // Attach to terminal on server
-    const ws = wsRef?.current;
-    if (ws && ws.readyState === 1) {
-      ws.send(JSON.stringify({
-        type: "TERMINAL_ATTACH",
-        payload: { terminalId },
-      }));
-    }
-
-    onReady?.();
-
-    return () => {
-      if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
-      resizeObserver.disconnect();
-      term.dispose();
-      const ws2 = wsRef?.current;
-      if (ws2 && ws2.readyState === 1) {
-        ws2.send(JSON.stringify({
-          type: "TERMINAL_DETACH",
-          payload: { terminalId },
-        }));
-      }
-    };
-  }, [terminalId]);
-
-  // Listen for terminal output from WebSocket
-  useEffect(() => {
+    // WS message handler — write terminal output to xterm
     function handleWsMessage(event) {
       try {
         const msg = JSON.parse(event.data);
@@ -134,12 +108,41 @@ export const XTerminal = forwardRef(function XTerminal({ terminalId, wsRef, onRe
       } catch {}
     }
 
-    const ws = wsRef?.current;
-    if (ws) {
+    // Attach listener + subscribe to terminal — retry until WS is ready
+    let attachedWs = null;
+    function tryAttach() {
+      const ws = wsRef?.current || window.__forgeWs;
+      if (!ws || ws.readyState !== 1) return false;
+      if (ws === attachedWs) return true; // already attached to this WS
+      // Detach old
+      if (attachedWs) attachedWs.removeEventListener("message", handleWsMessage);
+      // Attach new
+      attachedWs = ws;
       ws.addEventListener("message", handleWsMessage);
-      return () => ws.removeEventListener("message", handleWsMessage);
+      ws.send(JSON.stringify({ type: "TERMINAL_ATTACH", payload: { terminalId } }));
+      return true;
     }
-  }, [terminalId, wsRef?.current]);
+    if (!tryAttach()) {
+      const retryInterval = setInterval(() => {
+        if (tryAttach()) clearInterval(retryInterval);
+      }, 100); // fast retry — 100ms
+      setTimeout(() => clearInterval(retryInterval), 5000);
+    }
+
+    onReady?.();
+
+    return () => {
+      if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
+      resizeObserver.disconnect();
+      if (attachedWs) {
+        attachedWs.removeEventListener("message", handleWsMessage);
+        if (attachedWs.readyState === 1) {
+          attachedWs.send(JSON.stringify({ type: "TERMINAL_DETACH", payload: { terminalId } }));
+        }
+      }
+      term.dispose();
+    };
+  }, [terminalId]);
 
   return (
     <div

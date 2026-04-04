@@ -116,6 +116,13 @@ export function attachClient(terminalId, ws) {
   const entry = terminals.get(terminalId);
   if (!entry) return false;
   entry.clients.add(ws);
+  // Replay existing buffer so the client sees what already happened
+  if (entry.outputBuffer.length > 0) {
+    const history = entry.outputBuffer.join("");
+    if (ws.readyState === 1) {
+      ws.send(JSON.stringify({ type: "TERMINAL_OUTPUT", terminalId, data: history }));
+    }
+  }
   return true;
 }
 

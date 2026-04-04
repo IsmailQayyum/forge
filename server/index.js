@@ -17,6 +17,7 @@ import { gitRouter } from "./routes/git.js";
 import { claudemdRouter } from "./routes/claudemd.js";
 import { registryRouter } from "./routes/registry.js";
 import { workflowsRouter } from "./routes/workflows.js";
+import { settingsRouter } from "./routes/settings.js";
 import { integrationStore } from "./stores/integrations.js";
 import { getQuickActions } from "./stores/quick-actions.js";
 import { notificationsRouter } from "./routes/notifications.js";
@@ -50,8 +51,20 @@ app.use("/api/claudemd", claudemdRouter);
 app.use("/api/notifications", notificationsRouter);
 app.use("/api/registry", registryRouter);
 app.use("/api/workflows", workflowsRouter);
+app.use("/api/settings", settingsRouter);
 app.get("/api/quick-actions", (_, res) => res.json(getQuickActions()));
-app.get("/api/health", (_, res) => res.json({ ok: true, version: "1.0.0" }));
+app.get("/api/health", (_, res) => {
+  const sessions = sessionWatcher.getSessions();
+  const activeSessions = sessions.filter(s => s.status === "active").length;
+  res.json({
+    ok: true,
+    version: "1.0.0",
+    uptime: Math.floor(process.uptime()),
+    sessions: { total: sessions.length, active: activeSessions },
+    terminals: getTerminals().length,
+    pid: process.pid,
+  });
+});
 
 // Filesystem browse API
 import fs from "fs";
@@ -221,10 +234,25 @@ function handleClientMessage(msg, ws) {
 // Wire broadcast to hooks, runner, and start session watcher
 import { runManager } from "./agents/runner.js";
 import { workflowDaemon } from "./agents/workflows.js";
-setHooksBroadcast(broadcast);
-runManager.setBroadcast(broadcast);
-workflowDaemon.setBroadcast(broadcast);
-sessionWatcher.start(broadcast);
+import { costStore } from "./stores/costs.js";
+
+// Wrap broadcast to auto-record costs on token usage events
+function instrumentedBroadcast(type, payload) {
+  broadcast(type, payload);
+
+  // Auto-record costs when token usage is reported
+  if (type === "TOKEN_USAGE" && payload?.sessionId && payload?.usage) {
+    try {
+      const session = sessionWatcher.getSessions().find(s => s.id === payload.sessionId);
+      costStore.record(payload.sessionId, session?.project || "unknown", payload.usage);
+    } catch {}
+  }
+}
+
+setHooksBroadcast(instrumentedBroadcast);
+runManager.setBroadcast(instrumentedBroadcast);
+workflowDaemon.setBroadcast(instrumentedBroadcast);
+sessionWatcher.start(instrumentedBroadcast);
 
 server.listen(PORT, () => {
   console.log(`Forge server running on http://localhost:${PORT}`);
